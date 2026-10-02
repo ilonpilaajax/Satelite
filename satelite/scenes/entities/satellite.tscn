@@ -1,0 +1,54 @@
+[gd_scene format=3 uid="uid://d3i7eehas3fd7"]
+
+[ext_resource type="Script" uid="uid://ciq0vve0f83n8" path="res://scripts/systems/satellite/satellite.gd" id="1_sat"]
+[ext_resource type="Script" uid="uid://cjchwccl1y7dq" path="res://scripts/systems/satellite/stats_component.gd" id="2_stats"]
+[ext_resource type="Script" uid="uid://we2h3vudwo6l" path="res://scripts/systems/satellite/upgrade_component.gd" id="3_upgrades"]
+[ext_resource type="Script" uid="uid://oh5031uthiaq" path="res://scripts/systems/satellite/upgrade_definition.gd" id="4_1ercd"]
+[ext_resource type="Script" uid="uid://d4hnbpqemm6tu" path="res://scripts/systems/satellite/appearance_component.gd" id="4_appearance"]
+[ext_resource type="Script" uid="uid://byph8snnb1bm3" path="res://scripts/systems/satellite/action_component.gd" id="5_actions"]
+[ext_resource type="Resource" path="res://resources/upgrades/thruster.tres" id="6_thruster"]
+[ext_resource type="Resource" path="res://resources/upgrades/reaction_wheel.tres" id="8_wheel"]
+[ext_resource type="Script" uid="uid://br7xth1cn4dpb" path="res://scripts/systems/satellite/motion_component.gd" id="9_motion"]
+[ext_resource type="Texture2D" uid="uid://camljvsyc6b2m" path="res://resources/pixel-art-illustration-space-satellite-260nw-2408092339.png" id="10_o02dy"]
+
+[node name="Satellite" type="Node2D" unique_id=1550797153]
+script = ExtResource("1_sat")
+
+[node name="Body" type="Node2D" parent="." unique_id=1079480599]
+
+[node name="Stats" type="Node" parent="." unique_id=1054312761]
+script = ExtResource("2_stats")
+stat_meta = {
+&"distance_from_earth": {
+"caption": "DISTANCE FROM EARTH",
+"decimals": 0,
+"unit": "km"
+},
+&"name": {
+"caption": "NAME"
+},
+&"speed": {
+"caption": "SPEED",
+"decimals": 1,
+"unit": "km/s"
+}
+}
+
+[node name="Upgrades" type="Node" parent="." unique_id=797767683]
+script = ExtResource("3_upgrades")
+upgrades = Array[ExtResource("4_1ercd")]([ExtResource("6_thruster"), ExtResource("8_wheel")])
+
+[node name="Appearance" type="Node" parent="." unique_id=176231078]
+script = ExtResource("4_appearance")
+tint_targets = Array[NodePath]([NodePath("../Body")])
+scale_targets = Array[NodePath]([NodePath("../Body")])
+
+[node name="Actions" type="Node" parent="." unique_id=11629800]
+script = ExtResource("5_actions")
+
+[node name="Motion" type="Node" parent="." unique_id=11629801]
+script = ExtResource("9_motion")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1041286989]
+position = Vector2(301, 285)
+texture = ExtResource("10_o02dy")

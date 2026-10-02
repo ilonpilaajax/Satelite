@@ -1,0 +1,34 @@
+[gd_scene format=3 uid="uid://dpwm7nx38438"]
+
+[ext_resource type="PackedScene" uid="uid://b1kyx6hs4jg4t" path="res://scenes/main.tscn" id="1_8cavx"]
+[ext_resource type="Shader" uid="uid://d3iqirvcb7jn3" path="res://scripts/shaders/star-parralax.gdshader" id="1_oi734"]
+[ext_resource type="PackedScene" uid="uid://d3i7eehas3fd7" path="res://scenes/entities/satellite.tscn" id="3_ag4jm"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ag4jm"]
+shader = ExtResource("1_oi734")
+shader_parameter/dimensions = Vector2(1024, 600)
+shader_parameter/small_stars = 50.0
+shader_parameter/small_stars_far_size = 0.10000000149012
+shader_parameter/small_stars_near_size = 0.40000000596048
+shader_parameter/large_stars = 8.0
+shader_parameter/large_stars_far_size = 0.10000000149012
+shader_parameter/large_stars_near_size = 0.30000000447036
+shader_parameter/far_stars_color = Color(0.5626672, 0.0036286735, 0.92345303, 1)
+shader_parameter/near_stars_color = Color(1, 1, 1, 1)
+shader_parameter/base_scroll_speed = 0.0
+shader_parameter/additional_scroll_speed = 0.01999999955296
+
+[sub_resource type="CanvasTexture" id="CanvasTexture_laf4h"]
+
+[node name="Node2D" type="Node2D" unique_id=1845331764]
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1497263651]
+modulate = Color(0, 0, 0, 1)
+material = SubResource("ShaderMaterial_ag4jm")
+position = Vector2(301, 309)
+scale = Vector2(1088.1249, 688.594)
+texture = SubResource("CanvasTexture_laf4h")
+
+[node name="Main" parent="." unique_id=1701845390 instance=ExtResource("1_8cavx")]
+
+[node name="Satellite" parent="." unique_id=1550797153 instance=ExtResource("3_ag4jm")]

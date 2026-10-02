@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="SatelliteAction" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/satellite/action_definition.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"brake"
+display_name = "Brake"
+description = "Vents momentum. Free, but the thrusters need a moment to reset."
+stat_effects = {
+&"speed": -15.0
+}
+cost = 0
+cooldown = 1.5

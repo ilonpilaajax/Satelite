@@ -1,0 +1,85 @@
+[gd_scene format=3 uid="uid://41u0wevo6fas"]
+
+[ext_resource type="Script" uid="uid://cy5usfjog8lkc" path="res://scripts/ui/hud_bar.gd" id="1_hud"]
+
+[node name="HudBar" type="Control" unique_id=1127034181]
+layout_mode = 3
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -64.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("1_hud")
+
+[node name="Backdrop" type="ColorRect" parent="." unique_id=1018343241]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.0588235, 0.0627451, 0.0862745, 0.588235)
+
+[node name="TopLine" type="ColorRect" parent="." unique_id=192577322]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 1.0
+grow_horizontal = 2
+mouse_filter = 2
+color = Color(0.239216, 0.270588, 0.380392, 0.784314)
+
+[node name="Layout" type="HBoxContainer" parent="." unique_id=656560416]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 12.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 10
+
+[node name="PauseButton" type="Button" parent="Layout" unique_id=818859705]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(44, 40)
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "Pause"
+theme_override_font_sizes/font_size = 18
+text = "II"
+
+[node name="Separator" type="VSeparator" parent="Layout" unique_id=123112605]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="GalleryButton" type="Button" parent="Layout" unique_id=650599573]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(44, 40)
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "Gallery"
+theme_override_font_sizes/font_size = 18
+text = "G"
+
+[node name="UpgradeButton" type="Button" parent="Layout" unique_id=954894455]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(44, 40)
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "Upgrades"
+theme_override_font_sizes/font_size = 18
+text = "U"
+
+[node name="StatsButton" type="Button" parent="Layout" unique_id=835665944]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(44, 40)
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "Stats"
+theme_override_font_sizes/font_size = 18
+text = "S"
