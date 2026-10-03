@@ -1,6 +1,6 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene format=3]
 
-[ext_resource type="Script" path="res://scripts/ui/pause_menu.gd" id="1_pause"]
+[ext_resource type="Script" path="res://scripts/ui/parts_menu.gd" id="1_parts"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 bg_color = Color(0.0862745, 0.0941176, 0.129412, 0.980392)
@@ -14,18 +14,18 @@ corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 
-[node name="PauseMenu" type="Control"]
+[node name="PartsMenu" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_pause")
-menu_id = 1
-heading = "Pause"
-subtitle = "Game paused"
-content_placeholder = "Pause options will be added here."
+script = ExtResource("1_parts")
+menu_id = 5
+heading = "Parts"
+subtitle = "Fit hardware to the satellite"
+content_placeholder = "No parts are available for this satellite yet."
 
 [node name="Backdrop" type="ColorRect" parent="."]
 layout_mode = 1
@@ -42,71 +42,71 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 64.0
-offset_top = 64.0
-offset_right = -64.0
-offset_bottom = -64.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = -24.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
 
 [node name="Margin" type="MarginContainer" parent="Panel"]
 layout_mode = 2
-theme_override_constants/margin_left = 28
-theme_override_constants/margin_top = 24
-theme_override_constants/margin_right = 28
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 14
 
 [node name="Layout" type="VBoxContainer" parent="Panel/Margin"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 10
 
 [node name="Heading" type="Label" parent="Panel/Margin/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.85098, 0.890196, 1, 1)
-theme_override_font_sizes/font_size = 28
-text = "Pause"
+theme_override_font_sizes/font_size = 26
+text = "Parts"
 horizontal_alignment = 1
 
 [node name="Subtitle" type="Label" parent="Panel/Margin/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.478431, 0.529412, 0.639216, 1)
-text = "Game paused"
+text = "Fit hardware to the satellite"
+horizontal_alignment = 1
+
+[node name="Wallet" type="Label" parent="Panel/Margin/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85098, 0.890196, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = ""
 horizontal_alignment = 1
 
 [node name="Separator" type="HSeparator" parent="Panel/Margin/Layout"]
 layout_mode = 2
 
+[node name="Scroll" type="ScrollContainer" parent="Panel/Margin/Layout"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="List" type="VBoxContainer" parent="Panel/Margin/Layout/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
 [node name="ContentPlaceholder" type="Label" parent="Panel/Margin/Layout"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 120)
 layout_mode = 2
-size_flags_vertical = 3
 theme_override_colors/font_color = Color(0.560784, 0.607843, 0.717647, 1)
-text = "Pause options will be added here."
+text = "No parts are available for this satellite yet."
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 2
-
-[node name="Actions" type="HBoxContainer" parent="Panel/Margin/Layout"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="SaveButton" type="Button" parent="Panel/Margin/Layout/Actions"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Save"
-
-[node name="LoadButton" type="Button" parent="Panel/Margin/Layout/Actions"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Load"
 
 [node name="Status" type="Label" parent="Panel/Margin/Layout"]
 unique_name_in_owner = true
@@ -117,6 +117,6 @@ autowrap_mode = 2
 
 [node name="CloseButton" type="Button" parent="Panel/Margin/Layout"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 40)
+custom_minimum_size = Vector2(0, 36)
 layout_mode = 2
-text = "Resume"
+text = "Close"

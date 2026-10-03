@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="SignalDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/satellite/signal_definition.gd" id="1_sigdef"]
+
+[resource]
+script = ExtResource("1_sigdef")
+id = &"gamma_pulse"
+display_name = "Gamma pulse"
+signal_type = &"pulse"
+channel = &"radiation"
+description = "A hard burst of high-energy photons. Brief, and worth noticing."
+details = {
+&"Dose rate": "3.1 mSv/h",
+&"Duration": "0.4 s",
+&"Energy": "1.2 MeV"
+}

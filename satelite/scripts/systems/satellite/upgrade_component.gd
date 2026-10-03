@@ -118,6 +118,39 @@ func grant(upgrade_id: StringName, level: int) -> void:
 	upgrades_changed.emit()
 
 
+## Every owned level as {upgrade_id: level}, ready for a save file.
+func levels_snapshot() -> Dictionary:
+	var result: Dictionary = {}
+	for upgrade in upgrades:
+		if upgrade == null:
+			continue
+		var level := level_of(upgrade.id)
+		if level > 0:
+			result[upgrade.id] = level
+	return result
+
+
+## Puts back the levels from [method levels_snapshot], dropping any level the save
+## does not mention.
+##
+## Stats and appearance are deliberately left alone: they are restored as absolute
+## values by [Satellite], so applying the effects again here would double count
+## them. Unlocked actions are re-granted, because they are not part of any
+## absolute block - this is what brings back an action the level paid for.
+func restore_levels(levels: Dictionary) -> void:
+	_levels.clear()
+	for key: Variant in levels:
+		var upgrade := find(StringName(key))
+		if upgrade != null:
+			_levels[upgrade.id] = maxi(0, int(levels[key]))
+	for upgrade in upgrades:
+		if upgrade == null or level_of(upgrade.id) <= 0 or _actions == null:
+			continue
+		for action in upgrade.unlocks_actions:
+			_actions.grant(action)
+	upgrades_changed.emit()
+
+
 ## True when [param upgrade_id] has been bought at least once.
 func is_owned(upgrade_id: StringName) -> bool:
 	return level_of(upgrade_id) > 0

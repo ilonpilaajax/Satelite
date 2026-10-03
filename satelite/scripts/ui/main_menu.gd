@@ -13,4 +13,7 @@ func _ready() -> void:
 
 
 func _on_quit_pressed() -> void:
+	# Quitting does not raise the window manager's close request, so the autosave
+	# has to be asked for explicitly or the session is simply lost.
+	SaveManager.save_before_quit()
 	get_tree().quit()

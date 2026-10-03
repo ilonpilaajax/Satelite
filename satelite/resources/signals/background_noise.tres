@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SignalDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/satellite/signal_definition.gd" id="1_sigdef"]
+
+[resource]
+script = ExtResource("1_sigdef")
+id = &"background_noise"
+display_name = "Background hiss"
+signal_type = &"noise"
+channel = &"radio"
+description = "Nothing in it. The band, doing what the band does."
+details = {
+&"Bandwidth": "full",
+&"Origin": "galactic"
+}

@@ -1,6 +1,6 @@
-[gd_scene format=3 uid="uid://c3ns6l3par2uc"]
+[gd_scene format=3 uid="uid://d02ftym0scksx"]
 
-[ext_resource type="Script" path="res://scripts/ui/gallery_menu.gd" id="1_gallery"]
+[ext_resource type="Script" uid="uid://dyt1lkaelyaeg" path="res://scripts/ui/signals_menu.gd" id="1_signals"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 bg_color = Color(0.0862745, 0.0941176, 0.129412, 0.980392)
@@ -14,16 +14,20 @@ corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 
-[node name="GalleryMenu" type="Control" unique_id=2034379919]
+[node name="SignalsMenu" type="Control" unique_id=2034379919]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_gallery")
+script = ExtResource("1_signals")
+menu_id = 2
+heading = "Signals"
+subtitle = "What the antennas are picking up"
+content_placeholder = "No satellite is selected."
 
-[node name="Backdrop" type="ColorRect" parent="." unique_id=393181170]
+[node name="Backdrop" type="ColorRect" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -33,7 +37,7 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0.0431373, 0.0470588, 0.0666667, 0.960784)
 
-[node name="Panel" type="PanelContainer" parent="." unique_id=484701014]
+[node name="Panel" type="PanelContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -62,18 +66,37 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.85098, 0.890196, 1, 1)
 theme_override_font_sizes/font_size = 28
-text = "Gallery"
+text = "Signals"
 horizontal_alignment = 1
 
 [node name="Subtitle" type="Label" parent="Panel/Margin/Layout" unique_id=799402110]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.478431, 0.529412, 0.639216, 1)
-text = "Unlocked satellites"
+text = "What the antennas are picking up"
 horizontal_alignment = 1
 
 [node name="Separator" type="HSeparator" parent="Panel/Margin/Layout" unique_id=1554532262]
 layout_mode = 2
+
+[node name="Tabs" type="HBoxContainer" parent="Panel/Margin/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="TabsSeparator" type="HSeparator" parent="Panel/Margin/Layout"]
+layout_mode = 2
+
+[node name="Scroll" type="ScrollContainer" parent="Panel/Margin/Layout"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="List" type="VBoxContainer" parent="Panel/Margin/Layout/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
 
 [node name="ContentPlaceholder" type="Label" parent="Panel/Margin/Layout" unique_id=853822048]
 unique_name_in_owner = true
@@ -81,9 +104,16 @@ custom_minimum_size = Vector2(0, 120)
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_colors/font_color = Color(0.560784, 0.607843, 0.717647, 1)
-text = "The gallery will be filled in here."
+text = "No satellite is selected."
 horizontal_alignment = 1
 vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="Status" type="Label" parent="Panel/Margin/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.478431, 0.529412, 0.639216, 1)
+horizontal_alignment = 1
 autowrap_mode = 2
 
 [node name="CloseButton" type="Button" parent="Panel/Margin/Layout" unique_id=1717823505]

@@ -19,17 +19,21 @@ signal pause_changed(paused: bool)
 enum Id {
 	MAIN,
 	PAUSE,
-	GALLERY,
+	SIGNALS,
 	UPGRADE,
 	STATS,
+	PARTS,
+	DOWNLINK,
 }
 
 const MENU_PATHS := {
 	Id.MAIN: "res://scenes/ui/main_menu.tscn",
 	Id.PAUSE: "res://scenes/ui/pause_menu.tscn",
-	Id.GALLERY: "res://scenes/ui/gallery_menu.tscn",
+	Id.SIGNALS: "res://scenes/ui/signals_menu.tscn",
 	Id.UPGRADE: "res://scenes/ui/upgrade_menu.tscn",
 	Id.STATS: "res://scenes/ui/stats_menu.tscn",
+	Id.PARTS: "res://scenes/ui/parts_menu.tscn",
+	Id.DOWNLINK: "res://scenes/ui/downlink_menu.tscn",
 }
 
 const HUD_PATH := "res://scenes/ui/hud_bar.tscn"
@@ -37,8 +41,9 @@ const HUD_PATH := "res://scenes/ui/hud_bar.tscn"
 ## Full-screen menu reached with Escape. Acts as the quit menu.
 const BASE_MENU: int = Id.MAIN
 
-## Menus that freeze the game while they are on screen. The gallery, upgrade and
-## stats screens are overlays you can browse through while the game keeps running.
+## Menus that freeze the game while they are on screen. The signals, upgrade, stats,
+## parts and downlink screens are overlays you can browse through while the game
+## keeps running.
 const PAUSING_MENUS: Array[int] = [Id.MAIN, Id.PAUSE]
 
 ## Set to [code]true[/code] to boot straight into [constant BASE_MENU].

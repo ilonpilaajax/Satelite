@@ -18,6 +18,13 @@ const REASON_UNKNOWN := &"unknown_action"
 
 var _stats: SatelliteStats = null
 var _cooldowns: Dictionary = {}
+## Actions [member actions] started with. Anything beyond this set was granted at
+## runtime, which is what a save has to record.
+var _initial_ids: Array[StringName] = []
+
+
+func _ready() -> void:
+	_initial_ids = ids()
 
 
 ## Connects the stat block this component spends from. Call after the stats
@@ -49,6 +56,15 @@ func grant(action: SatelliteAction) -> void:
 	action_granted.emit(action)
 
 
+## Id of every action currently available, in order.
+func ids() -> Array[StringName]:
+	var result: Array[StringName] = []
+	for action in actions:
+		if action != null:
+			result.append(action.id)
+	return result
+
+
 func remaining_cooldown(action_id: StringName) -> float:
 	return maxf(0.0, float(_cooldowns.get(action_id, 0.0)))
 
@@ -74,6 +90,56 @@ func perform(action_id: StringName) -> bool:
 		cooldown_changed.emit(action, action.cooldown)
 	action_performed.emit(action)
 	return true
+
+
+## Cooldowns still running, as {action_id: seconds left}.
+func cooldowns_snapshot() -> Dictionary:
+	var result: Dictionary = {}
+	for id: Variant in _cooldowns:
+		result[StringName(id)] = float(_cooldowns[id])
+	return result
+
+
+## Actions that were granted at runtime, i.e. by an upgrade or a part rather than
+## shipped in [member actions]. The shipped ones come back with the scene, so a
+## save only has to name what was added.
+func granted_snapshot() -> Array[StringName]:
+	var result: Array[StringName] = []
+	for id in ids():
+		if not id in _initial_ids:
+			result.append(id)
+	return result
+
+
+## Puts back the actions from [method granted_snapshot] and the cooldowns that
+## were still running. A cooldown resumes where it left off, so a save taken
+## mid-boost comes back as a boost in progress.
+##
+## Named rather than [code]load_data[/code] on purpose: [Satellite] composes every
+## module into one payload, so nothing below the aggregate root answers the save
+## contract and a save file holds one entry per satellite instead of one per
+## module.
+func restore(granted: Variant, cooldowns: Variant) -> void:
+	for id: Variant in _ids_from(granted):
+		var action := find(StringName(id))
+		if action != null:
+			grant(action)
+	_cooldowns.clear()
+	if not (cooldowns is Dictionary):
+		return
+	for id: Variant in (cooldowns as Dictionary):
+		_cooldowns[StringName(id)] = float((cooldowns as Dictionary)[id])
+
+
+static func _ids_from(raw: Variant) -> Array:
+	var result: Array = []
+	if raw is Array:
+		for id: Variant in (raw as Array):
+			result.append(id)
+	elif raw is PackedStringArray:
+		for id: String in (raw as PackedStringArray):
+			result.append(StringName(id))
+	return result
 
 
 func _tick_cooldowns(delta: float) -> void:

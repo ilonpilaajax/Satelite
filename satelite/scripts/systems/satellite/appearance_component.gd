@@ -58,6 +58,15 @@ func set_visuals(values: Dictionary) -> void:
 	appearance_changed.emit(snapshot())
 
 
+## Replaces the tracked visuals with [param values] instead of merging into them,
+## so a key the save no longer mentions really goes away. That is what restoring a
+## save needs; [method set_visuals] is the one that layers changes on top.
+func restore(values: Dictionary) -> void:
+	_visuals = values.duplicate(true)
+	_apply()
+	appearance_changed.emit(snapshot())
+
+
 func get_visual(key: StringName, fallback: Variant = null) -> Variant:
 	return _visuals.get(key, fallback)
 

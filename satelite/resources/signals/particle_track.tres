@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SignalDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/satellite/signal_definition.gd" id="1_sigdef"]
+
+[resource]
+script = ExtResource("1_sigdef")
+id = &"particle_track"
+display_name = "Particle track"
+signal_type = &"track"
+channel = &"particles"
+description = "A charged particle went through the detector. One count, already gone."
+details = {
+&"Energy": "12.4 keV",
+&"Events": "1"
+}

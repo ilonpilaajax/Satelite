@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://ciq0vve0f83n8" path="res://scripts/systems/satellite/satellite.gd" id="1_sat"]
 [ext_resource type="Script" uid="uid://cjchwccl1y7dq" path="res://scripts/systems/satellite/stats_component.gd" id="2_stats"]
+[ext_resource type="Script" uid="uid://d05edommcsdow" path="res://scripts/systems/satellite/control-panel.gd" id="2_xm7qd"]
 [ext_resource type="Script" uid="uid://we2h3vudwo6l" path="res://scripts/systems/satellite/upgrade_component.gd" id="3_upgrades"]
 [ext_resource type="Script" uid="uid://oh5031uthiaq" path="res://scripts/systems/satellite/upgrade_definition.gd" id="4_1ercd"]
 [ext_resource type="Script" uid="uid://d4hnbpqemm6tu" path="res://scripts/systems/satellite/appearance_component.gd" id="4_appearance"]
@@ -10,18 +11,60 @@
 [ext_resource type="Resource" path="res://resources/upgrades/reaction_wheel.tres" id="8_wheel"]
 [ext_resource type="Script" uid="uid://br7xth1cn4dpb" path="res://scripts/systems/satellite/motion_component.gd" id="9_motion"]
 [ext_resource type="Texture2D" uid="uid://camljvsyc6b2m" path="res://resources/pixel-art-illustration-space-satellite-260nw-2408092339.png" id="10_o02dy"]
+[ext_resource type="Script" uid="uid://dydxr0hgrdops" path="res://scripts/systems/satellite/parts_component.gd" id="11_parts"]
+[ext_resource type="Script" uid="uid://cy3py5q316yym" path="res://scripts/systems/satellite/part_definition.gd" id="12_partdef"]
+[ext_resource type="Resource" path="res://resources/parts/solar_panel.tres" id="13_panel"]
+[ext_resource type="Resource" path="res://resources/parts/cargo_bay.tres" id="14_cargo"]
+[ext_resource type="Resource" path="res://resources/parts/main_thruster.tres" id="15_main_thruster"]
+[ext_resource type="Resource" path="res://resources/parts/radio_antenna.tres" id="16_radio"]
+[ext_resource type="Resource" path="res://resources/parts/radiation_sensor.tres" id="17_radiation"]
+[ext_resource type="Resource" path="res://resources/parts/high_gain_array.tres" id="18_gain"]
+[ext_resource type="Script" uid="uid://ca5sxcf5kqe8u" path="res://scripts/systems/satellite/downlink_component.gd" id="19_downlink"]
+[ext_resource type="Script" path="res://scripts/systems/satellite/signal_definition.gd" id="21_sigdef"]
+[ext_resource type="Resource" path="res://resources/signals/hab_carrier.tres" id="22_hab"]
+[ext_resource type="Resource" path="res://resources/signals/telemetry_burst.tres" id="23_burst"]
+[ext_resource type="Resource" path="res://resources/signals/background_noise.tres" id="24_noise"]
+[ext_resource type="Resource" path="res://resources/signals/solar_glare.tres" id="25_flare"]
+[ext_resource type="Resource" path="res://resources/signals/lunar_beacon.tres" id="26_beacon"]
+[ext_resource type="Resource" path="res://resources/signals/particle_track.tres" id="27_track"]
+[ext_resource type="Resource" path="res://resources/signals/debris_swarm.tres" id="28_swarm"]
+[ext_resource type="Resource" path="res://resources/signals/solar_flux_alert.tres" id="29_flux"]
+[ext_resource type="Resource" path="res://resources/signals/gamma_pulse.tres" id="30_gamma"]
 
 [node name="Satellite" type="Node2D" unique_id=1550797153]
 script = ExtResource("1_sat")
 
+[node name="Control-Panel" type="Node" parent="." unique_id=684543767]
+script = ExtResource("2_xm7qd")
+signals = Array[ExtResource("21_sigdef")]([ExtResource("22_hab"), ExtResource("23_burst"), ExtResource("24_noise"), ExtResource("25_flare"), ExtResource("26_beacon"), ExtResource("27_track"), ExtResource("28_swarm"), ExtResource("29_flux"), ExtResource("30_gamma")])
+
 [node name="Body" type="Node2D" parent="." unique_id=1079480599]
+
+[node name="Sprite2D" type="Sprite2D" parent="Body" unique_id=1041286989]
+position = Vector2(301, 285)
+texture = ExtResource("10_o02dy")
 
 [node name="Stats" type="Node" parent="." unique_id=1054312761]
 script = ExtResource("2_stats")
+stats = {
+&"credits": 250.0,
+&"data_sent": 0.0,
+&"distance_from_earth": 0.0,
+&"name": "SATELITE-01",
+&"speed": 7.66
+}
 stat_meta = {
+&"data_sent": {
+"caption": "DATA SENT",
+"decimals": 0,
+"unit": "Mb"
+},
 &"distance_from_earth": {
 "caption": "DISTANCE FROM EARTH",
 "decimals": 0,
+"secondary_conversion": "km_to_au",
+"secondary_unit": "AU",
+"secondary_whole_numbers": true,
 "unit": "km"
 },
 &"name": {
@@ -38,6 +81,11 @@ stat_meta = {
 script = ExtResource("3_upgrades")
 upgrades = Array[ExtResource("4_1ercd")]([ExtResource("6_thruster"), ExtResource("8_wheel")])
 
+[node name="Parts" type="Node" parent="." unique_id=1539920464]
+script = ExtResource("11_parts")
+parts = Array[ExtResource("12_partdef")]([ExtResource("13_panel"), ExtResource("14_cargo"), ExtResource("15_main_thruster"), ExtResource("16_radio"), ExtResource("17_radiation"), ExtResource("18_gain")])
+currency_stat = &"credits"
+
 [node name="Appearance" type="Node" parent="." unique_id=176231078]
 script = ExtResource("4_appearance")
 tint_targets = Array[NodePath]([NodePath("../Body")])
@@ -49,6 +97,5 @@ script = ExtResource("5_actions")
 [node name="Motion" type="Node" parent="." unique_id=11629801]
 script = ExtResource("9_motion")
 
-[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1041286989]
-position = Vector2(301, 285)
-texture = ExtResource("10_o02dy")
+[node name="Downlink" type="Node" parent="." unique_id=1937460285]
+script = ExtResource("19_downlink")

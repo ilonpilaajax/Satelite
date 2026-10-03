@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PartDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/satellite/part_definition.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"radiation_sensor"
+display_name = "Radiation Sensor"
+description = "A dosimeter head. Nothing survives the belts without one."
+category = &"sensor"
+stat_effects = {
+&"radiation_level": 1.0,
+&"antenna_range": 10.0
+}
+price = 75

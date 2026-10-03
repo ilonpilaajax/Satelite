@@ -1,0 +1,51 @@
+[gd_scene format=3 uid="uid://d3jhtcb7wm0ef"]
+
+[ext_resource type="Shader" uid="uid://d3iqirvcb7jn3" path="res://scripts/shaders/star-parralax.gdshader" id="1_bkp1e"]
+
+[sub_resource type="CanvasTexture" id="CanvasTexture_bkp1e"]
+
+[sub_resource type="Gradient" id="Gradient_bkp1e"]
+colors = PackedColorArray(0, 0, 0, 1, 0.7815122, 0.95576125, 0.9685733, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_y0upk"]
+gradient = SubResource("Gradient_bkp1e")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_y0upk"]
+shader = ExtResource("1_bkp1e")
+shader_parameter/dimensions = Vector2(1024, 600)
+shader_parameter/small_stars = 50.0
+shader_parameter/small_stars_far_size = 0.10000000149012
+shader_parameter/small_stars_near_size = 0.40000000596048
+shader_parameter/large_stars = 8.0
+shader_parameter/large_stars_far_size = 0.10000000149012
+shader_parameter/large_stars_near_size = 0.30000000447036
+shader_parameter/background_color = Color(0, 0, 0, 0)
+shader_parameter/background_alpha = 1.0
+shader_parameter/far_stars_color = Color(0.5626672, 0.0036286735, 0.92345303, 1)
+shader_parameter/near_stars_color = Color(1, 1, 1, 1)
+shader_parameter/base_scroll_speed = 0.0
+shader_parameter/additional_scroll_speed = 0.01999999955296
+
+[sub_resource type="CanvasTexture" id="CanvasTexture_jougr"]
+
+[node name="Background" type="Node2D" unique_id=625939915]
+
+[node name="Sky" type="Sprite2D" parent="." unique_id=1953031740]
+modulate = Color(0, 0, 0, 1)
+position = Vector2(275, 590.41174)
+rotation = -1.5707964
+scale = Vector2(2070.2378, 1393.9601)
+texture = SubResource("CanvasTexture_bkp1e")
+
+[node name="Sky2" type="Sprite2D" parent="." unique_id=553313334]
+position = Vector2(245, 3390)
+rotation = 1.5707964
+scale = Vector2(57.16254, 57.349556)
+texture = SubResource("GradientTexture2D_y0upk")
+
+[node name="Stars" type="Sprite2D" parent="." unique_id=316435265]
+material = SubResource("ShaderMaterial_y0upk")
+position = Vector2(301, 309)
+rotation = -1.5707964
+scale = Vector2(1088.1249, 688.594)
+texture = SubResource("CanvasTexture_jougr")

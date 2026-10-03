@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PartDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/satellite/part_definition.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"cargo_bay"
+display_name = "Cargo Bay"
+description = "Extra room for hardware you have not bought yet."
+category = &"structure"
+stat_effects = {
+&"cargo": 8.0
+}
+price = 35
+max_owned = 3

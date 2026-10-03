@@ -13,6 +13,21 @@ uniform float large_stars = 8.0; // Number of large stars. Rows for horizontally
 uniform float large_stars_far_size : hint_range(0.1, 1.0, 0.1) = 0.5;
 uniform float large_stars_near_size : hint_range(0.1, 1.0, 0.1) = 1.0;
 
+// The backdrop the stars are drawn onto. This is written outright rather than mixed
+// into COLOR, so the shader no longer depends on the node's texture or its modulate
+// and the backdrop can be set from the inspector alone.
+// Setting its alpha to 0 makes the starfield an overlay: whatever is drawn behind this
+// node shows through, and only the stars remain.
+uniform vec4 background_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
+
+// Opacity of the backdrop on its own, so it can be faded without opening the colour
+// picker. Multiplied into background_color.a, so the two compose: the colour carries
+// the tint and this carries how solid it is.
+// This does not dim the stars. They are composited on top of the backdrop and keep
+// their own opacity, which is the point - fading the black out from under a starfield
+// should reveal the scene behind it, not erase the stars with it.
+uniform float background_alpha : hint_range(0.0, 1.0, 0.01) = 1.0;
+
 // Replace the below references to 'source_color' with 'hint_color' if you are using a version of Godot before 4.
 uniform vec4 far_stars_color : source_color = vec4(0.50, 0.0, 1.0, 1.0);
 uniform vec4 near_stars_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
@@ -56,8 +71,21 @@ void fragment() {
 	vec4 star_color = mix(far_stars_color, near_stars_color, small_star_rn);
 	float star_size = small_stars_far_size + (small_stars_near_size - small_stars_far_size) * small_star_rn;
 
+// Base layer. Starts from the backdrop uniform rather than from COLOR, which is what
+// makes background_color and background_alpha the only things that decide how solid
+// and what colour the space behind the stars is.
+	COLOR = vec4(background_color.rgb, clamp(background_color.a * background_alpha, 0.0, 1.0));
+
 // Render small stars as circles with soft edges:
-	COLOR.rgb = mix(COLOR.rgb, star_color.rgb, max((star_size - length(small_star_uv)) / star_size, 0.0) * star_color.a);
+// Each star is composited over the backdrop with the "over" operator: the colour is
+// mixed in by how much of the pixel the star covers, and the coverage is then added
+// into alpha. The alpha half is what was missing before - it used to be left at the
+// node's modulate, so a transparent backdrop stayed opaque no matter what COLOR held.
+//	COLOR.rgb = mix(COLOR.rgb, star_color.rgb, small_star_cover);
+//	COLOR.a = min(COLOR.a + small_star_cover * (1.0 - COLOR.a), 1.0);
+	float small_star_cover = max((star_size - length(small_star_uv)) / star_size, 0.0) * star_color.a;
+	COLOR.rgb = mix(COLOR.rgb, star_color.rgb, small_star_cover);
+	COLOR.a = min(COLOR.a + small_star_cover * (1.0 - COLOR.a), 1.0);
 
 // Render small stars as circles with hard edges:
 //	COLOR.rgb = mix(COLOR.rgb, star_color.rgb, greater_than(star_size, length(small_star_uv)) * star_color.a);
@@ -86,7 +114,11 @@ void fragment() {
 //	COLOR.rgb = mix(COLOR.rgb, star_color.rgb, max((star_size - length(large_star_uv)) / star_size, 0.0) * star_color.a);
 
 // Render large stars with circles and crosses with smooth edges:
-	COLOR.rgb = mix(COLOR.rgb, star_color.rgb, (max((star_size / 1.7 - length(large_star_uv)) / star_size, 0.0) + max((star_size - length(large_star_uv)) / star_size / 2.0, 0.0) * (max(greater_than(star_size / 10.0, abs(large_star_uv.x)), greater_than(star_size / 10.0, abs(large_star_uv.y))))) * star_color.a);
+// Same "over" compositing as the small stars, so a large star also makes the pixel
+// more opaque rather than only brighter.
+	float large_star_cover = (max((star_size / 1.7 - length(large_star_uv)) / star_size, 0.0) + max((star_size - length(large_star_uv)) / star_size / 2.0, 0.0) * (max(greater_than(star_size / 10.0, abs(large_star_uv.x)), greater_than(star_size / 10.0, abs(large_star_uv.y))))) * star_color.a;
+	COLOR.rgb = mix(COLOR.rgb, star_color.rgb, large_star_cover);
+	COLOR.a = min(COLOR.a + large_star_cover * (1.0 - COLOR.a), 1.0);
 
 // Render large stars as circles with hard edges:
 //	COLOR.rgb = mix(COLOR.rgb, star_color.rgb, greater_than(star_size, length(large_star_uv)) * star_color.a);

@@ -3,11 +3,11 @@ extends CanvasLayer
 ## tracks.
 ##
 ## Nothing here is hardcoded. The satellite's [SatelliteStats] hands over one
-## descriptor per stat - id, caption, unit, precision, value - and the bar builds
-## a cell for each. Adding a stat to a satellite makes it appear here with no
-## change to this script; captions and units come from the satellite's
-## [code]stat_meta[/code], so the formatting lives next to the definition rather
-## than in the UI.
+## descriptor per stat - id, caption, unit, precision, value, and an optional second
+## unit already converted - and the bar builds a cell for each. Adding a stat to a
+## satellite makes it appear here with no change to this script; captions, units and
+## the conversion between them come from the satellite's [code]stat_meta[/code], so the
+## formatting lives next to the definition rather than in the UI.
 ##
 ## The only thing this script knows about the satellite layer is one method on
 ## the hub and two signals, so the readout keeps working for any satellite.
@@ -116,12 +116,30 @@ func _add_cell(descriptor: Dictionary) -> void:
 	_value_labels[descriptor.get("id")] = value
 
 
+## Renders a stat as its secondary unit first, then its own: "0.00000006 AU / 9 km".
+## The secondary unit comes first because that is the order the readout was asked for,
+## and because a stat with a secondary unit is being read at two scales at once, coarse
+## to fine.
+##
+## The secondary block is derived from the same tracked value the primary one shows,
+## computed by [SatelliteStats], so the two can never disagree. A readout with no
+## secondary unit is unchanged and shows only its own.
 func _format(descriptor: Dictionary) -> String:
-	var value: Variant = descriptor.get("value")
-	var unit := str(descriptor.get("unit", ""))
+	var primary := _format_in(descriptor.get("value"), str(descriptor.get("unit", "")), int(descriptor.get("decimals", 1)))
+	var secondary: Variant = descriptor.get("secondary")
+	if not (secondary is Dictionary):
+		return primary
+	var alt: Dictionary = secondary
+	var alt_unit := str(alt.get("unit", ""))
+	if alt_unit.is_empty():
+		return primary
+	return "%s / %s" % [_format_in(alt.get("value"), alt_unit, int(alt.get("decimals", 1))), primary]
+
+
+func _format_in(value: Variant, unit: String, decimals: int) -> String:
 	var text: String
 	if value is float:
-		text = String.num(float(value), int(descriptor.get("decimals", 1)))
+		text = String.num(float(value), decimals)
 	elif value is int:
 		text = str(value)
 	else:

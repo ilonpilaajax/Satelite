@@ -57,14 +57,14 @@ text = "II"
 layout_mode = 2
 mouse_filter = 2
 
-[node name="GalleryButton" type="Button" parent="Layout" unique_id=650599573]
+[node name="SignalsButton" type="Button" parent="Layout" unique_id=650599573]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(44, 40)
 layout_mode = 2
 size_flags_vertical = 4
-tooltip_text = "Gallery"
+tooltip_text = "Signals"
 theme_override_font_sizes/font_size = 18
-text = "G"
+text = "N"
 
 [node name="UpgradeButton" type="Button" parent="Layout" unique_id=954894455]
 unique_name_in_owner = true
@@ -83,3 +83,25 @@ size_flags_vertical = 4
 tooltip_text = "Stats"
 theme_override_font_sizes/font_size = 18
 text = "S"
+
+[node name="Separator2" type="VSeparator" parent="Layout" unique_id=1937460284]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="PartsButton" type="Button" parent="Layout" unique_id=1265803011]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(44, 40)
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "Parts"
+theme_override_font_sizes/font_size = 18
+text = "P"
+
+[node name="DownlinkButton" type="Button" parent="Layout" unique_id=1738254906]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(44, 40)
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "Downlink"
+theme_override_font_sizes/font_size = 18
+text = "D"

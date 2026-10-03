@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SignalDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/satellite/signal_definition.gd" id="1_sigdef"]
+
+[resource]
+script = ExtResource("1_sigdef")
+id = &"debris_swarm"
+display_name = "Debris swarm"
+signal_type = &"swarm"
+channel = &"particles"
+description = "A lot of small things, all at once, all going roughly the same way."
+details = {
+&"Density": "high",
+&"Events": "340"
+}

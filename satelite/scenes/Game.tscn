@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://dpwm7nx38438"]
+
+[ext_resource type="PackedScene" uid="uid://b1kyx6hs4jg4t" path="res://scenes/main.tscn" id="2_78awf"]
+[ext_resource type="PackedScene" uid="uid://d3i7eehas3fd7" path="res://scenes/entities/satellite.tscn" id="3_s0nni"]
+[ext_resource type="PackedScene" uid="uid://d3jhtcb7wm0ef" path="res://scenes/background.tscn" id="4_78awf"]
+
+[node name="Game" type="Node2D" unique_id=1845331764]
+
+[node name="Background" parent="." unique_id=625939915 instance=ExtResource("4_78awf")]
+
+[node name="Main" parent="." unique_id=1701845390 instance=ExtResource("2_78awf")]
+
+[node name="Satellite" parent="." unique_id=1550797153 instance=ExtResource("3_s0nni")]

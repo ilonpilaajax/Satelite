@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Satelite"
-run/main_scene="res://scenes/Sky.tscn"
+run/main_scene="res://scenes/Game.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 
 MenuController="*res://autoload/menu_controller.gd"
 SatelliteController="*res://autoload/satellite_controller.gd"
+SaveManager="*res://autoload/save_manager.gd"
 
 [display]
 
