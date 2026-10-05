@@ -14,6 +14,7 @@ border_color = Color(0.239216, 0.270588, 0.380392, 0.784314)
 [node name="StatsHud" type="CanvasLayer"]
 layer = 10
 script = ExtResource("1_stats")
+columns = 3
 
 [node name="TopBar" type="PanelContainer" parent="."]
 anchors_preset = 10
@@ -27,5 +28,4 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_bar")
 layout_mode = 2
 theme_override_constants/h_separation = 28
 theme_override_constants/v_separation = 4
-columns = 2
 mouse_filter = 2

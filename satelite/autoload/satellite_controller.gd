@@ -9,7 +9,7 @@ extends Node
 ## [codeblock]
 ## SatelliteController.stats_changed.connect(_on_stats_changed)
 ## SatelliteController.purchase_upgrade(&"thruster")
-## SatelliteController.purchase_part(&"solar_panel")
+## SatelliteController.purchase_part(&"solar_panels")
 ## SatelliteController.transmit_data(&"spectrum_sweep")
 ## SatelliteController.set_visual(&"tint", Color.RED)
 ## [/codeblock]
@@ -32,6 +32,9 @@ signal upgrade_purchased(upgrade: Resource, level: int)
 signal upgrades_changed()
 signal part_purchased(part: Resource, owned: int)
 signal parts_changed()
+## What is fitted to which mount changed. [param slot] is -1 when the whole
+## arrangement did, which is what a mount count change and a save load report.
+signal slots_changed(slot: int)
 signal appearance_changed(snapshot: Dictionary)
 signal action_performed(action: Resource)
 ## Republished from the satellite's downlink: [param sent_count] is how many times
@@ -53,6 +56,7 @@ const BOUND_SIGNALS: Array[StringName] = [
 	&"upgrades_changed",
 	&"part_purchased",
 	&"parts_changed",
+	&"slots_changed",
 	&"appearance_changed",
 	&"action_performed",
 	&"data_transmitted",
@@ -187,6 +191,63 @@ func purchase_part(part_id: StringName) -> bool:
 	return _as_bool(_call_active(&"purchase_part", [part_id]))
 
 
+# --- Slots ------------------------------------------------------------------
+
+## One entry per mount on the active satellite, in order: whether anything is
+## fitted there, what, and where on the body the mount sits. Fitting picks a
+## mount from this list, which is what decides where the part appears.
+func slot_states() -> Array:
+	var result: Variant = _call_active(&"slot_states")
+	return (result as Array) if result is Array else []
+
+
+## How many mounts the active satellite has. Five today.
+func available_slots() -> int:
+	return _as_int(_call_active(&"available_slots"))
+
+
+## Fits [param part_id] into [param slot], replacing whatever was fitted there.
+## Reports whether it happened. Refused for a mount this satellite does not
+## have, a part that is not in its catalogue, and a part that is not bought yet
+## - mounting is a decision, but it is not the one that costs credits.
+func fit_part(part_id: StringName, slot: int) -> bool:
+	return _as_bool(_call_active(&"fit_part", [part_id, slot]))
+
+
+## Empties [param slot], returning what was fitted there or null.
+func unfit_part(slot: int) -> Resource:
+	var result: Variant = _call_active(&"unfit_part", [slot])
+	return result as Resource if result is Resource else null
+
+
+## Which mount [param part_id] is fitted to, or -1 when it is fitted nowhere. The lowest of
+## the mounts when it is fitted to several; a part bought but not yet mounted reads -1, as
+## does one that has been replaced.
+func slot_of_part(part_id: StringName) -> int:
+	return _as_int(_call_active(&"slot_of_part", [part_id]))
+
+
+## Every mount [param part_id] is fitted to, in order. Empty when it is fitted nowhere. A
+## part bought more than once can be fitted to several mounts at once, so this is the whole
+## answer to "where is all of it" rather than [method slot_of_part] alone.
+func slots_of_part(part_id: StringName) -> Array:
+	var result: Variant = _call_active(&"slots_of_part", [part_id])
+	return (result as Array) if result is Array else []
+
+
+## How many copies of [param part_id] are fitted to a mount, which is never more than were
+## bought. What a part's stat effects have already been paying for.
+func fitted_count_of_part(part_id: StringName) -> int:
+	return _as_int(_call_active(&"fitted_count_of_part", [part_id]))
+
+
+## Whether another copy of [param part_id] could be fitted as things stand, without moving
+## one that already is. What a shop row uses to decide between buying another copy and
+## moving the ones it has.
+func can_fit_part(part_id: StringName) -> bool:
+	return _as_bool(_call_active(&"can_fit_part", [part_id]))
+
+
 # --- Actions ---------------------------------------------------------------
 
 func action_catalogue() -> Array:
@@ -293,6 +354,7 @@ func _handler_for(signal_name: StringName) -> Callable:
 		&"upgrades_changed": return _on_upgrades_changed
 		&"part_purchased": return _on_part_purchased
 		&"parts_changed": return _on_parts_changed
+		&"slots_changed": return _on_slots_changed
 		&"appearance_changed": return _on_appearance_changed
 		&"action_performed": return _on_action_performed
 		&"data_transmitted": return _on_data_transmitted
@@ -341,6 +403,10 @@ func _on_part_purchased(part: Resource, owned: int) -> void:
 
 func _on_parts_changed() -> void:
 	parts_changed.emit()
+
+
+func _on_slots_changed(slot: int) -> void:
+	slots_changed.emit(slot)
 
 
 func _on_appearance_changed(snapshot: Dictionary) -> void:

@@ -5,7 +5,8 @@
 [sub_resource type="CanvasTexture" id="CanvasTexture_bkp1e"]
 
 [sub_resource type="Gradient" id="Gradient_bkp1e"]
-colors = PackedColorArray(0, 0, 0, 1, 0.7815122, 0.95576125, 0.9685733, 1)
+offsets = PackedFloat32Array(0, 0.5903614, 0.88554215, 1)
+colors = PackedColorArray(0, 0, 0, 1, 0.39070752, 0.21214569, 0.62966573, 1, 0.5932217, 0.6267028, 0.8281678, 1, 0.99588746, 0.8939282, 0.8408684, 1)
 
 [sub_resource type="GradientTexture2D" id="GradientTexture2D_y0upk"]
 gradient = SubResource("Gradient_bkp1e")
@@ -28,6 +29,52 @@ shader_parameter/additional_scroll_speed = 0.01999999955296
 
 [sub_resource type="CanvasTexture" id="CanvasTexture_jougr"]
 
+[sub_resource type="CanvasTexture" id="CanvasTexture_laf4h"]
+
+[sub_resource type="Animation" id="Animation_jougr"]
+length = 0.001
+
+[sub_resource type="Animation" id="Animation_cbsqf"]
+resource_name = "ground-tospace"
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Camera2D:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 1),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector2(300, 4853), Vector2(300, 300)]
+}
+
+[sub_resource type="Animation" id="Animation_bkp1e"]
+resource_name = "idle"
+
+[sub_resource type="Animation" id="Animation_y0upk"]
+resource_name = "space-toground"
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Camera2D:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 1),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector2(300, 300), Vector2(300, 4853)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_y0upk"]
+_data = {
+&"RESET": SubResource("Animation_jougr"),
+&"ground-tospace": SubResource("Animation_cbsqf"),
+&"idle": SubResource("Animation_bkp1e"),
+&"space-toground": SubResource("Animation_y0upk")
+}
+
 [node name="Background" type="Node2D" unique_id=625939915]
 
 [node name="Sky" type="Sprite2D" parent="." unique_id=1953031740]
@@ -38,7 +85,7 @@ scale = Vector2(2070.2378, 1393.9601)
 texture = SubResource("CanvasTexture_bkp1e")
 
 [node name="Sky2" type="Sprite2D" parent="." unique_id=553313334]
-position = Vector2(245, 3390)
+position = Vector2(299, 3390)
 rotation = 1.5707964
 scale = Vector2(57.16254, 57.349556)
 texture = SubResource("GradientTexture2D_y0upk")
@@ -49,3 +96,35 @@ position = Vector2(301, 309)
 rotation = -1.5707964
 scale = Vector2(1088.1249, 688.594)
 texture = SubResource("CanvasTexture_jougr")
+
+[node name="Station" type="Node2D" parent="." unique_id=632980020]
+position = Vector2(0, 5149)
+
+[node name="Ground" type="Sprite2D" parent="Station" unique_id=934802627]
+modulate = Color(0.21176471, 0.4745098, 0.3137255, 1)
+position = Vector2(339.99988, 90.00025)
+scale = Vector2(3893.9998, 277.99994)
+texture = SubResource("CanvasTexture_laf4h")
+
+[node name="Sprite2D4" type="Sprite2D" parent="Station" unique_id=1854834382]
+modulate = Color(0.38170326, 0.38170323, 0.38170323, 1)
+position = Vector2(526, -297.00018)
+scale = Vector2(50.999973, 229.64088)
+texture = SubResource("CanvasTexture_laf4h")
+
+[node name="Sprite2D3" type="Sprite2D" parent="Station" unique_id=1099233700]
+position = Vector2(416.93747, -134.35931)
+scale = Vector2(340.12503, 167.2812)
+texture = SubResource("CanvasTexture_laf4h")
+
+[node name="Sprite2D2" type="Sprite2D" parent="Station" unique_id=529159003]
+modulate = Color(0.38170326, 0.38170323, 0.38170323, 1)
+position = Vector2(297.99997, -51.921722)
+scale = Vector2(579.99994, 27.124918)
+texture = SubResource("CanvasTexture_laf4h")
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=2023951752]
+position = Vector2(300, 300)
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1455451054]
+libraries/ = SubResource("AnimationLibrary_y0upk")

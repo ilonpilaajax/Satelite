@@ -50,6 +50,13 @@ const DATA_SENT := &"data_sent"
 ## "secondary_conversion": "km_to_au", "secondary_whole_numbers": true}}[/code].
 ## See [constant SECONDARY_CONVERSIONS] for the conversions and
 ## [code]secondary_scale[/code] for a raw multiplier instead.
+##
+## A stat may also say where it belongs:
+## [code]"hud": true[/code] puts it on the top readout bar, and a
+## [code]"tab"[/code] names the stats-menu submenu it is listed under. The two
+## readouts split the stats between them - the bar takes what claims
+## [code]hud[/code] and the menu lists the rest - so a stat can never end up in
+## both places or in neither, and neither readout needs a list of its own.
 @export var stat_meta: Dictionary = {}
 
 ## One astronomical unit in kilometres, from the IAU's 2012 exact definition. The
@@ -149,14 +156,17 @@ func caption_for(id: StringName) -> String:
 	return str(id).to_upper().replace("_", " ")
 
 
-## Every tracked stat as {id, caption, unit, decimals, value}, in the order the
-## ids were added. This is what a readout renders, so adding a stat to this node
-## makes it appear in the UI with no UI change.
+## Every tracked stat as {id, caption, unit, decimals, value, hud, tab}, in the
+## order the ids were added. This is what a readout renders, so adding a stat to
+## this node makes it appear in the UI with no UI change.
 ##
 ## Carries a [code]secondary[/code] block for any stat whose [member stat_meta] asks
-## for a second unit. It is computed from [code]value[/code] right here, which is the
-## point: the second unit is a view of the one tracked number, not a second number
+## for a second unit. It is computed from [code]value[/code] right here, which is
+## the point: the second unit is a view of the one tracked number, not a second number
 ## that has to be kept in step with it.
+##
+## [code]hud[/code] and [code]tab[/code] say which readout the stat belongs to. See
+## [member stat_meta]; [method format_value] renders the value they carry.
 func descriptors() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for key: Variant in _values:
@@ -169,8 +179,40 @@ func descriptors() -> Array[Dictionary]:
 			"decimals": int(meta.get("decimals", 1)),
 			"value": _values[key],
 			"secondary": _secondary_for(id, _values[key]),
+			"hud": bool(meta.get("hud", false)),
+			"tab": str(meta.get("tab", "")),
 		})
 	return result
+
+
+## A descriptor's value as it should be read on screen.
+##
+## Static, and here rather than in either readout, so the top bar and the stats menu cannot
+## drift into formatting the same number two different ways.
+static func format_value(descriptor: Dictionary) -> String:
+	var primary := _format_in(descriptor.get("value"), str(descriptor.get("unit", "")),
+		int(descriptor.get("decimals", 1)))
+	var secondary: Variant = descriptor.get("secondary")
+	if not (secondary is Dictionary):
+		return primary
+	var alt: Dictionary = secondary
+	var alt_unit := str(alt.get("unit", ""))
+	if alt_unit.is_empty():
+		return primary
+	# The secondary unit first, because that is the order the stat asked for, and because
+	# a stat with a secondary unit is being read at two scales at once, coarse to fine.
+	return "%s / %s" % [_format_in(alt.get("value"), alt_unit, int(alt.get("decimals", 1))), primary]
+
+
+static func _format_in(value: Variant, unit: String, decimals: int) -> String:
+	var text: String
+	if value is float:
+		text = String.num(float(value), decimals)
+	else:
+		# Ints and strings alike: a stat is free to hold something that is not a number,
+		# and the satellite's own name is one.
+		text = str(value)
+	return "%s %s" % [text, unit] if not unit.is_empty() else text
 
 
 ## The second readout for [param id] as {unit, decimals, value}, or an empty

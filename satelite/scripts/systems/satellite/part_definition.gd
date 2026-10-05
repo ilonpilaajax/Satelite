@@ -21,6 +21,20 @@ extends Resource
 ## nothing else reads it.
 @export var category: StringName = &""
 
+## Which channel of the satellite's control panel this hardware works for, e.g.
+## [code]&"radio"[/code] or [code]&"particles"[/code]. Empty for a part that serves
+## no channel.
+##
+## This is what turns fitted hardware into the panel's antenna counts: how many copies of a
+## part are mounted is how much of that channel the satellite can hear, which is what
+## [code]set_antenna_counts[/code] in [code]control-panel.gd[/code] is told. A part with no
+## channel is still bought and still drawn on the body - it simply has no channel to
+## contribute to, which is the right answer for anything that is not an instrument.
+##
+## Set this on the part, not on a mount: one part definition is however many copies of that
+## antenna the satellite carries, and each copy fitted in its own mount adds one to the count.
+@export var antenna_channel: StringName = &""
+
 ## Stat deltas written **once**, when the part is fitted, e.g. {&"speed": 2.0}.
 ## Any stat id works, including ids no node tracks yet: the stat block accepts new
 ## ids and the readout picks them up from its descriptors.

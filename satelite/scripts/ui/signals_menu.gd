@@ -34,6 +34,18 @@ extends MenuPanel
 ## Which channel's signals are listed. Kept between visits: re-picking a tab every time
 ## the menu opens is busywork when you came back to the same channel.
 var _selected_id: StringName = &""
+## The signal to bring into view on the next rebuild, set by [method select_signal] and
+## cleared as soon as it has been applied. Not kept: a later rebuild - a new detection, a
+## satellite swap - would otherwise drag the list back to a row the player has already
+## moved away from.
+var _target_signal_id: StringName = &""
+## The stylebox for the signal the player arrived from, so it is obvious which row the
+## list scrolled to. Built from the plain row style rather than written out separately, so
+## the two cannot drift apart.
+var _marked_style: StyleBoxFlat = null
+## The channel the rows on screen belong to, so a rebuild that has swapped the channel's
+## rows underneath the list knows the scroll offset now points at the wrong row.
+var _built_id: StringName = &""
 ## Tab buttons by channel id, used to restore the pressed state and the found count.
 var _tabs: Dictionary = {}
 var _group: ButtonGroup = null
@@ -45,6 +57,9 @@ var _panel: Node = null
 
 @onready var _tabs_box: HBoxContainer = get_node_or_null("%Tabs")
 @onready var _list_box: VBoxContainer = get_node_or_null("%List")
+## By path rather than by unique name, because this is the editor's scene and adding a
+## unique name to it would mean every save of the scene could conflict with the change.
+@onready var _scroll: ScrollContainer = get_node_or_null(^"Panel/Margin/Layout/Scroll")
 @onready var _placeholder: Label = get_node_or_null("%ContentPlaceholder")
 @onready var _status_label: Label = get_node_or_null("%Status")
 
@@ -63,6 +78,19 @@ func _on_open() -> void:
 	_set_status("")
 	_apply_tab_state()
 	_rebuild()
+
+
+## Picks the tab [param channel] belongs to and scrolls [param signal_id] into view, so
+## a signal picked from the event log lands on its own row rather than on the top of the
+## tab. Both are optional; an unknown or empty id is left to the rebuild to correct, which
+## falls back to the first tab listed.
+##
+## Public because the event log steers this from a line the player clicked, and it calls
+## this before opening the menu, so the opening rebuild lands on the right tab with the
+## right row in view.
+func select_signal(channel: StringName, signal_id: StringName = &"") -> void:
+	_selected_id = channel
+	_target_signal_id = signal_id
 
 
 # --- Panel ------------------------------------------------------------------
@@ -167,23 +195,108 @@ func _rebuild() -> void:
 		_apply_tab_state()
 
 	var findings: Array = _panel.call(&"findings_for", _selected_id)
+	# The cap decides how many rows exist at all, so a signal past its end would not merely
+	# be off screen - it would not be there to scroll to. The window is centred on the
+	# wanted signal rather than starting on it, so there is context on both sides and the
+	# scroll below has room to put it in the middle without running off the end.
+	var first: int = 0
+	if not _target_signal_id.is_empty():
+		var wanted: int = _index_of(findings, _target_signal_id)
+		first = clampi(wanted - max_visible_rows / 2, 0, maxi(findings.size() - max_visible_rows, 0))
+
+	# Different rows are on screen now, so an offset carried over from the last channel
+	# would leave the list scrolled past rows that are no longer there. A pending target
+	# sets its own offset at the end of this, and a rebuild that only adds to the same
+	# channel keeps the offset so a new detection does not yank the view.
+	if _selected_id != _built_id:
+		if _scroll != null:
+			_scroll.scroll_vertical = 0
+		_built_id = _selected_id
+
 	var shown := 0
-	for row: Dictionary in findings:
+	for index: int in range(first, findings.size()):
 		if shown >= max_visible_rows:
 			break
-		_list_box.add_child(_build_row(row))
+		_list_box.add_child(_build_row(findings[index]))
 		shown += 1
 
 	if findings.is_empty():
 		_add_nothing_found()
-	elif shown < findings.size():
-		_add_more(int(findings.size()) - shown)
+	elif first + shown < findings.size():
+		_add_more(int(findings.size()) - first - shown)
+
+	_apply_target()
+
+
+## Brings the signal the player arrived from into view, then forgets it so the next rebuild
+## leaves the list where they left it. A no-op on an ordinary rebuild.
+func _apply_target() -> void:
+	if _target_signal_id.is_empty():
+		return
+	var wanted := _target_signal_id
+	_target_signal_id = &""
+	var row: Control = _row_for(wanted)
+	if row == null:
+		return
+	row.add_theme_stylebox_override(&"panel", _make_marked_row_style())
+	_scroll_to(row)
+
+
+## Position of the finding with this id in the rows as the panel lists them, or -1.
+func _index_of(findings: Array, signal_id: StringName) -> int:
+	for index: int in findings.size():
+		var row: Dictionary = findings[index]
+		if StringName(row.get("id", &"")) == signal_id:
+			return index
+	return -1
+
+
+## The row on screen for this signal, or null when it is not one of the rows built.
+func _row_for(signal_id: StringName) -> Control:
+	if _list_box == null:
+		return null
+	for child in _list_box.get_children():
+		if child is Control and StringName(child.get_meta(&"signal_id", &"")) == signal_id:
+			return child
+	return null
+
+
+## Scrolls so [param row] sits in the middle of the list, deferred, because the container
+## has not been laid out since the rebuild and asking for a position now would use the one
+## the rows had before they existed.
+func _scroll_to(row: Control) -> void:
+	if _scroll == null or row == null:
+		return
+	_scroll_later.call_deferred(row)
+
+
+func _scroll_later(row: Control) -> void:
+	await get_tree().process_frame
+	if _scroll == null or not is_inside_tree() or not is_instance_valid(row):
+		return
+	# Centred rather than aligned to the top, so the rows around it give some context
+	# about where in the channel this signal sits.
+	var target: float = row.position.y + row.size.y * 0.5 - _scroll.size.y * 0.5
+	_scroll.scroll_vertical = int(maxf(target, 0.0))
+
+
+## The row style for the signal the player came from. Derived from the plain row style so
+## the two always match apart from the highlight.
+func _make_marked_row_style() -> StyleBoxFlat:
+	if _marked_style == null:
+		_marked_style = _make_row_style()
+		_marked_style.bg_color = _marked_style.bg_color.lightened(0.14)
+		_marked_style.border_color = Color(0.478431, 0.533333, 0.701961, 0.784314)
+	return _marked_style
 
 
 func _build_row(row: Dictionary) -> Control:
 	var panel := PanelContainer.new()
 	if _row_style != null:
 		panel.add_theme_stylebox_override(&"panel", _row_style)
+	# So the row a signal arrived on can be found again and scrolled to, without this file
+	# having to match rows up against the list order.
+	panel.set_meta(&"signal_id", StringName(row.get("id", &"")))
 
 	var columns := HBoxContainer.new()
 	columns.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -323,5 +436,6 @@ func _on_active_changed(_satellite: Node) -> void:
 	# A different satellite has a different panel and a different catalogue, so a pick
 	# from the old one is meaningless now.
 	_selected_id = &""
+	_built_id = &""
 	_bind_panel()
 	_rebuild()

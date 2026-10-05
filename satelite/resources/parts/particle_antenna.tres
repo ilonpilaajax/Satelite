@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="PartDefinition" format=3 uid="uid://cdt0fgpi2klmg"]
+
+[ext_resource type="Script" uid="uid://cy3py5q316yym" path="res://scripts/systems/satellite/part_definition.gd" id="1_def"]
+[ext_resource type="Script" uid="uid://c8oxy8bjwo0yk" path="res://scripts/systems/satellite/action_definition.gd" id="2_5cdlq"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"particle_antenna"
+display_name = "Particle Antenna"
+description = "A charged collector that counts what the solar wind brings past. Fit several to hear the particle channel better."
+category = &"sensor"
+antenna_channel = &"particles"
+stat_effects = {
+&"antenna_range": 20.0,
+&"particle_signal": 1.0
+}
+price = 70
+max_owned = 4

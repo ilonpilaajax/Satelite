@@ -1,15 +1,15 @@
 extends Node
 ## The satellite's instrument panel: what its antennas are picking up.
 ##
-## This is where a [b]signal is found[/b]. [member channels] says where to listen,
-## [member signals] says what could turn up, and [method detect_new_signal] files
-## whatever was heard as a finding. The signals menu lists those findings and nothing
-## else, so the panel is the single source of what has been picked up.
+## The four [code]run_*[/code] functions below are the detection loop: each counts its
+## own channel off, and on a hit calls [method detect_new_signal] with that channel's
+## id. That is where a [b]signal is found[/b] - it picks one of the catalogue's
+## [SignalDefinition]s for the channel and files it, and the signals menu lists the
+## findings.
 ##
-## Every channel is described by one entry in [member channels], naming the fields on
-## this node it reads. Adding a channel is one table entry plus the fields it names -
-## there is no per-channel code anywhere in this file, which is why the four near
-## identical [code]run_radio[/code]-style functions it used to have are gone.
+## [member channels] exists only so the signals menu knows what to put in its tabs; the
+## detection itself reads the fields on this node directly, so adding a channel is a
+## [code]run_*[/code] function, four fields and one [member channels] entry.
 ##
 ## [b]Distance from Earth does not live here[/b]. It used to, as a plain
 ## [code]distance_from_earth[/code] variable fed by [code]add_distance()[/code], which
@@ -31,135 +31,225 @@ extends Node
 ## The readout needs no code at all: [code]stats_hud.gd[/code] renders every stat
 ## the satellite tracks, so the distance appears and updates on its own.
 
-## Emitted whenever a signal is heard, so a menu listing findings does not have to
+## Emitted whenever a signal is heard, so the menu listing findings does not have to
 ## poll. [param count] is how many times in total.
 signal signal_found(channel: StringName, found: Resource, count: int)
-## Emitted when findings are cleared or the catalogue changes.
+## Emitted when findings are cleared.
 signal signals_changed()
+## Emitted when the antenna counts change, carrying {channel: count}. A part fitted to a
+## mount is one antenna, so mounting hardware changes what the panel is listening with.
+signal antenna_counts_changed(counts: Dictionary)
 
-## The channels this panel listens on, in tab order. Each entry names the fields on
-## this node it reads, so this is the only place that knows how a channel maps onto the
-## satellite - the signals menu renders whatever is listed here rather than keeping its
-## own copy of these names.
-##
-## [code]active_field[/code] gates detection for the channel, so switching it off also
-## stops that channel accumulating findings. [code]period[/code] is how many seconds
-## pass between listens; [code]timer_field[/code] counts down to the next one, and a
-## timer left at zero means "listen on the next frame", which is why the panel hears
-## something immediately on the first frame rather than after a full period.
+## The channels this panel listens on, in tab order. Presentation only - the signals
+## menu builds its tabs from this, and nothing here reads it, so a channel appearing on
+## screen is a one-entry change.
 @export var channels: Array[Dictionary] = [
-	{
-		"id": &"radio",
-		"label": "Radio",
-		"caption": "RADIO SIGNALS",
-		"active_field": "detecting_radio_signals",
-		"strength_field": "anten_strenght_radio",
-		"range_field": "search_range_radio",
-		"timer_field": "timer_radio",
-		"period": 5.0,
-	},
-	{
-		"id": &"radiation",
-		"label": "Radiation",
-		"caption": "RADIATION LEVEL",
-		"active_field": "detecting_radiation_level",
-		"strength_field": "anten_strenght_radiation",
-		"range_field": "search_range_radiation",
-		"timer_field": "timer_radiation",
-		"period": 7.0,
-	},
-	{
-		"id": &"light",
-		"label": "Light",
-		"caption": "LIGHT",
-		"active_field": "detecting_light",
-		"strength_field": "anten_strenght_light",
-		"range_field": "search_range_light",
-		"timer_field": "timer_light",
-		"period": 6.0,
-	},
-	{
-		"id": &"particles",
-		"label": "Particles",
-		"caption": "PARTICLES",
-		"active_field": "detecting_particles",
-		"strength_field": "anten_strenght_particles",
-		"range_field": "search_range_particles",
-		"timer_field": "timer_particles",
-		"period": 9.0,
-	},
+	{"id": &"radio", "label": "Radio", "caption": "RADIO SIGNALS"},
+	{"id": &"radiation", "label": "Radiation", "caption": "RADIATION LEVEL"},
+	{"id": &"light", "label": "Light", "caption": "LIGHT"},
+	{"id": &"particles", "label": "Particles", "caption": "PARTICLES"},
 ]
+
+## Which channel each id passed to [method detect_new_signal] refers to, in the order
+## the [code]run_*[/code] functions pass them: radio 0, radiation 1, light 2,
+## particles 3. Kept next to those calls so the numbers stay traceable.
+const CHANNEL_BY_ID: Array[StringName] = [&"radio", &"radiation", &"light", &"particles"]
 
 ## Signals this panel is able to detect. Anything here whose [member
 ## SignalDefinition.channel] matches a channel can turn up on it. An empty catalogue is
 ## valid: nothing is ever found, and the signals menu shows its empty message.
 @export var signals: Array[SignalDefinition] = []
 
-## How likely each channel is to hear something, against its reach. The chance of a
-## detection on a listen is strength / range, so widening the range makes a channel
-## quieter rather than just busier.
-##
-## Detection is on for every channel, so the satellite is listening from the first
-## frame. Set an [code]active_field[/code] false in the inspector to take a channel
-## offline.
-var detecting_radio_signals: bool = true
-var anten_strenght_radio: float = 20.0
-var search_range_radio: float = 100.0
-var detecting_radiation_level: bool = true
-var anten_strenght_radiation: float = 15.0
-var search_range_radiation: float = 80.0
-var detecting_light: bool = true
-var anten_strenght_light: float = 25.0
-var search_range_light: float = 120.0
-var detecting_particles: bool = true
-var anten_strenght_particles: float = 10.0
-var search_range_particles: float = 60.0
+# Satelite
 
-## Seconds until each channel next listens. Zero means "now", so all four start at zero
-## and the panel hears on its first frame. Named by [code]timer_field[/code] in
-## [member channels].
-var timer_radio: float = 0.0
-var timer_radiation: float = 0.0
-var timer_light: float = 0.0
-var timer_particles: float = 0.0
+# Solar Panels
+var solar_panel_level:int
+
+
+# Radio
+var detecting_radio_signals:bool = true
+var anten_ammount_radio:int = 0
+var anten_strenght_radio:int = 3
+var timer_radio:float
+var search_range_radio:float = 3
+
+# Radiation
+var detecting_radiation_level:bool = true
+var anten_ammount_radiation:int = 0
+var anten_strenght_radiation:int
+var timer_radiation:float
+var search_range_radiation:float
+
+# Light
+var detecting_light:bool = true
+var anten_ammount_light:int = 0
+var anten_strenght_light:int
+var timer_light:float
+var search_range_light:float
+
+# Particles
+var detecting_particles:bool = true
+var anten_ammount_particles:int = 0
+var anten_strenght_particles:int
+var timer_particles:float
+var search_range_particles:float
+
+# --- Antennas ---------------------------------------------------------------
+
+## Antenna counts per channel, as {channel: count}. Fitted hardware writes this through
+## [method set_antenna_counts]; nothing else keeps it up to date, because the mounts are the
+## only place that knows what is on the satellite.
+var _antenna_counts: Dictionary = {}
 
 ## Findings, keyed by channel then by signal id, so a signal heard again is counted
 ## rather than listed twice. Each entry is {definition, count, strength}.
 var _found: Dictionary = {}
 
 
-func _process(_delta: float) -> void:
-	for entry: Dictionary in channels:
-		if _flag(entry, "active_field"):
-			_run(entry)
-
-
-## One listen. Counts the channel's timer down; on the frame it runs out, refills it to
-## the channel's period and rolls for a detection.
-func _run(entry: Dictionary) -> void:
-	var remaining := _number(entry, "timer_field") - get_process_delta_time()
-	if remaining > 0.0:
-		_set_number(entry, "timer_field", remaining)
-		return
-	_set_number(entry, "timer_field", float(entry.get("period", 5.0)))
-	var reach := _number(entry, "range_field")
-	if reach <= 0.0:
-		return
-	# randi_range wants whole numbers; a float range used to raise here, which meant the
-	# detection path had never actually run.
-	if float(randi_range(0, int(reach))) > _number(entry, "strength_field"):
-		return
-	detect_new_signal(StringName(entry.get("id", &"")))
-
-
-# --- What has been found ----------------------------------------------------
-
-## Files a detection on [param channel]: one of the catalogue's signals for that
-## channel, at random, recorded with the strength it came in at.
+## Takes the antenna counts off the satellite's mounts. [param counts] is {channel: count},
+## counting each fitted part once per mount it is fitted to, which is what makes a second
+## copy of an antenna a second antenna rather than the same one twice.
 ##
-## This is where a finding comes from. [method _run] decides whether to listen; this
-## decides what was heard.
-func detect_new_signal(channel: StringName) -> void:
+## Channels absent from [param counts] go to zero rather than being left as they were: a
+## channel whose last antenna was replaced is no longer being listened to, and keeping the
+## old number would report hardware that is not there. The per-channel fields above and
+## [method antenna_counts] are both written here, so they cannot disagree.
+func set_antenna_counts(counts: Dictionary) -> void:
+	var next: Dictionary = {}
+	for channel: StringName in CHANNEL_BY_ID:
+		var count := maxi(int(counts.get(channel, 0)), 0)
+		next[channel] = count
+		_set_channel_count(channel, count)
+	# A channel this panel does not keep a field for still counts, so a new kind of
+	# antenna is readable without adding a field for it first.
+	for channel: Variant in counts:
+		var id := StringName(channel)
+		if id.is_empty() or next.has(id):
+			continue
+		next[id] = maxi(int(counts[channel]), 0)
+	if next == _antenna_counts:
+		return
+	_antenna_counts = next
+	antenna_counts_changed.emit(next)
+
+
+## How many antennas are fitted on [param channel], or 0.
+func antenna_count_of(channel: StringName) -> int:
+	return int(_antenna_counts.get(channel, 0))
+
+
+## Every channel's antenna count, as {channel: count}.
+func antenna_counts() -> Dictionary:
+	return _antenna_counts.duplicate()
+
+
+## Writes one count to whichever field the panel keeps for that channel. Matched by channel
+## rather than written by id, so adding a channel is a field and an entry in
+## [constant CHANNEL_BY_ID] and nothing else.
+func _set_channel_count(channel: StringName, count: int) -> void:
+	match channel:
+		&"radio": anten_ammount_radio = count
+		&"radiation": anten_ammount_radiation = count
+		&"light": anten_ammount_light = count
+		&"particles": anten_ammount_particles = count
+
+
+func _ready():
+	pass
+
+## A newly bought antenna does not wait for the next scheduled listen: it sweeps as soon as
+## it is bought, and whatever it hears is filed on its channel like any other finding.
+##
+## [param part] is the antenna that was bought. Anything without an
+## [member PartDefinition.antenna_channel] - solar panels, say - is not an antenna, so
+## buying it does nothing here. Called without an argument it is a no-op rather than an
+## error, which keeps a bare call from anywhere harmless.
+func detect_new_anten(part: Resource = null) -> void:
+	var channel := _channel_of(part)
+	if channel.is_empty() or not _is_listening(channel):
+		return
+	_record(channel)
+
+
+## Which channel [param part] listens on, or empty when it is null or carries no channel.
+## Read off the part rather than typed, so the panel keeps working with any resource the
+## shop can sell and does not have to import the parts catalogue.
+func _channel_of(part: Resource) -> StringName:
+	if part == null:
+		return &""
+	var channel: Variant = part.get(&"antenna_channel")
+	return StringName(channel) if channel != null else &""
+
+
+## Whether [param channel] is switched on, read from the same field its [code]run_*[/code]
+## function checks, so a fresh antenna obeys a muted channel exactly as a scheduled listen
+## does.
+func _is_listening(channel: StringName) -> bool:
+	match channel:
+		&"radio": return detecting_radio_signals
+		&"radiation": return detecting_radiation_level
+		&"light": return detecting_light
+		&"particles": return detecting_particles
+	return false
+
+func _process(delta: float) -> void:
+	if detecting_radio_signals:run_radio(delta)
+	if detecting_radiation_level:run_radiation(delta)
+	if detecting_light:run_light(delta)
+	if detecting_particles:run_particles(delta)
+
+func run_radio(delta):
+	timer_radio -= delta
+	if timer_radio <= 0:
+		timer_radio = randi_range(2,8)
+		# randi_range takes whole numbers, so the float range is cast here. Without it
+		# this raised every call and the channel never detected anything.
+		var random_value = randi_range(0, int(search_range_radio))
+		if random_value <= anten_strenght_radio:detect_new_signal(0)
+
+func run_radiation(delta):
+	timer_radiation -= delta
+	if timer_radiation <= 0:
+		timer_radiation = randi_range(2,8)
+		var random_value = randi_range(0, int(anten_strenght_radiation))
+		if random_value <= anten_strenght_radiation:detect_new_signal(1)
+
+func run_light(delta):
+	timer_light -= delta
+	if timer_light <= 0:
+		timer_light = randi_range(2,8)
+		var random_value = randi_range(0, int(search_range_light))
+		if random_value <= anten_strenght_light:detect_new_signal(2)
+
+func run_particles(delta):
+	timer_particles -= delta
+	if timer_particles <= 0:
+		timer_particles = randi_range(2,8)
+		var random_value = randi_range(0, int(search_range_particles))
+		if random_value <= anten_strenght_particles:detect_new_signal(3)
+
+
+## Records a detection on the channel [param id] refers to. The id cases are the ones
+## this always had; what each does now is file a finding rather than nothing.
+func detect_new_signal(id:int):
+	print("detected", id)
+	match id:
+		0:
+			_record(&"radio")
+		1:
+			_record(&"radiation")
+		2:
+			_record(&"light")
+		3:
+			_record(&"particles")
+		4:
+			pass
+
+
+## Files one of the catalogue's signals for [param channel] as heard, at a random
+## strength. Repeat detections of the same signal raise its count instead of adding a
+## second row, so a channel that keeps hearing one carrier still lists it once.
+func _record(channel: StringName) -> void:
 	var options := signals_for(channel)
 	if options.is_empty():
 		return
@@ -179,9 +269,6 @@ func detect_new_signal(channel: StringName) -> void:
 ## What has been heard on [param channel], one row per signal, already carrying
 ## everything a list needs to render: id, name, type, icon, description, the signal's
 ## own details, the measured strength and how many times it has been heard.
-##
-## Resolved here rather than in the menu so the two can never disagree, in the same
-## spirit as [method SatelliteStats.descriptors] driving the stats readout.
 func findings_for(channel: StringName) -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
 	var by_channel: Dictionary = _found.get(channel, {})
@@ -191,9 +278,8 @@ func findings_for(channel: StringName) -> Array[Dictionary]:
 		if definition == null:
 			continue
 		var details: Dictionary = (definition.details as Dictionary).duplicate()
-		# The measured strength and the count are added to whatever the definition
-		# declared. They go in last so a measurement always wins over a description
-		# that happened to use the same key.
+		# The measured strength and the count go in last, so a measurement always wins
+		# over a description that happened to use the same key.
 		details["Strength"] = "%d%%" % roundi(float(found.get("strength", 0.0)) * 100.0)
 		var count := int(found.get("count", 0))
 		if count > 1:
@@ -221,7 +307,7 @@ func signals_for(channel: StringName) -> Array[SignalDefinition]:
 
 
 ## Every channel as {id, label, caption, found, total}, which is what the signals menu
-## builds its tabs from, so adding a channel here is all it takes to get a tab.
+## builds its tabs from.
 func channel_tabs() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for entry: Dictionary in channels:
@@ -244,24 +330,3 @@ func clear_findings(channel: StringName = &"") -> void:
 	else:
 		_found.erase(channel)
 	signals_changed.emit()
-
-
-# --- Reading the channel table -----------------------------------------------
-
-## The field an entry names, read as a number. 0 for a name that is absent or holds
-## something non-numeric, so a renamed field quietly disables that channel rather than
-## raising every frame.
-func _number(entry: Dictionary, key: String) -> float:
-	var value: Variant = get(str(entry.get(key, "")))
-	return float(value) if (value is float or value is int) else 0.0
-
-
-func _set_number(entry: Dictionary, key: String, value: float) -> void:
-	var field := str(entry.get(key, ""))
-	if not field.is_empty():
-		set(field, value)
-
-
-func _flag(entry: Dictionary, key: String) -> bool:
-	var value: Variant = get(str(entry.get(key, "")))
-	return value is bool and value

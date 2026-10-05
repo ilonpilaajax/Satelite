@@ -1,7 +1,10 @@
-[gd_scene load_steps=2 format=3 uid="uid://b1kyx6hs4jg4t"]
+[gd_scene format=3 uid="uid://b1kyx6hs4jg4t"]
 
 [ext_resource type="PackedScene" path="res://scenes/ui/stats_hud.tscn" id="1_stats"]
+[ext_resource type="PackedScene" uid="uid://24fgk4dmbk2x" path="res://scenes/ui/event_log.tscn" id="2_log"]
 
 [node name="Main" type="Node" unique_id=1768208204]
 
-[node name="StatsHud" parent="." instance=ExtResource("1_stats")]
+[node name="StatsHud" parent="." unique_id=1152202062 instance=ExtResource("1_stats")]
+
+[node name="EventLog" parent="." unique_id=469443872 instance=ExtResource("2_log")]

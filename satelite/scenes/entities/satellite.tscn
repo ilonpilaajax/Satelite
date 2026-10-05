@@ -10,17 +10,14 @@
 [ext_resource type="Resource" path="res://resources/upgrades/thruster.tres" id="6_thruster"]
 [ext_resource type="Resource" path="res://resources/upgrades/reaction_wheel.tres" id="8_wheel"]
 [ext_resource type="Script" uid="uid://br7xth1cn4dpb" path="res://scripts/systems/satellite/motion_component.gd" id="9_motion"]
-[ext_resource type="Texture2D" uid="uid://camljvsyc6b2m" path="res://resources/pixel-art-illustration-space-satellite-260nw-2408092339.png" id="10_o02dy"]
 [ext_resource type="Script" uid="uid://dydxr0hgrdops" path="res://scripts/systems/satellite/parts_component.gd" id="11_parts"]
+[ext_resource type="Script" path="res://scripts/systems/satellite/slots_component.gd" id="31_slots"]
 [ext_resource type="Script" uid="uid://cy3py5q316yym" path="res://scripts/systems/satellite/part_definition.gd" id="12_partdef"]
-[ext_resource type="Resource" path="res://resources/parts/solar_panel.tres" id="13_panel"]
-[ext_resource type="Resource" path="res://resources/parts/cargo_bay.tres" id="14_cargo"]
-[ext_resource type="Resource" path="res://resources/parts/main_thruster.tres" id="15_main_thruster"]
-[ext_resource type="Resource" path="res://resources/parts/radio_antenna.tres" id="16_radio"]
-[ext_resource type="Resource" path="res://resources/parts/radiation_sensor.tres" id="17_radiation"]
-[ext_resource type="Resource" path="res://resources/parts/high_gain_array.tres" id="18_gain"]
+[ext_resource type="Resource" path="res://resources/parts/radio_antenna.tres" id="13_radio"]
+[ext_resource type="Resource" path="res://resources/parts/particle_antenna.tres" id="14_particle"]
+[ext_resource type="Resource" path="res://resources/parts/solar_panels.tres" id="15_panels"]
 [ext_resource type="Script" uid="uid://ca5sxcf5kqe8u" path="res://scripts/systems/satellite/downlink_component.gd" id="19_downlink"]
-[ext_resource type="Script" path="res://scripts/systems/satellite/signal_definition.gd" id="21_sigdef"]
+[ext_resource type="Script" uid="uid://51gghjg5q413" path="res://scripts/systems/satellite/signal_definition.gd" id="21_sigdef"]
 [ext_resource type="Resource" path="res://resources/signals/hab_carrier.tres" id="22_hab"]
 [ext_resource type="Resource" path="res://resources/signals/telemetry_burst.tres" id="23_burst"]
 [ext_resource type="Resource" path="res://resources/signals/background_noise.tres" id="24_noise"]
@@ -31,6 +28,46 @@
 [ext_resource type="Resource" path="res://resources/signals/solar_flux_alert.tres" id="29_flux"]
 [ext_resource type="Resource" path="res://resources/signals/gamma_pulse.tres" id="30_gamma"]
 
+[sub_resource type="CanvasTexture" id="CanvasTexture_i5eai"]
+
+[sub_resource type="CanvasTexture" id="CanvasTexture_21r20"]
+
+[sub_resource type="Animation" id="Animation_i5eai"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Body:scale")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(1, 1)]
+}
+
+[sub_resource type="Animation" id="Animation_21r20"]
+resource_name = "idle"
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Body:scale")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0.033333335, 0.5, 1),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(1, 1), Vector2(0.7, 0.7), Vector2(1, 1)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_i5eai"]
+_data = {
+&"RESET": SubResource("Animation_i5eai"),
+&"idle": SubResource("Animation_21r20")
+}
+
 [node name="Satellite" type="Node2D" unique_id=1550797153]
 script = ExtResource("1_sat")
 
@@ -39,10 +76,183 @@ script = ExtResource("2_xm7qd")
 signals = Array[ExtResource("21_sigdef")]([ExtResource("22_hab"), ExtResource("23_burst"), ExtResource("24_noise"), ExtResource("25_flare"), ExtResource("26_beacon"), ExtResource("27_track"), ExtResource("28_swarm"), ExtResource("29_flux"), ExtResource("30_gamma")])
 
 [node name="Body" type="Node2D" parent="." unique_id=1079480599]
+position = Vector2(310, 296)
 
-[node name="Sprite2D" type="Sprite2D" parent="Body" unique_id=1041286989]
-position = Vector2(301, 285)
-texture = ExtResource("10_o02dy")
+[node name="Upper-Module" type="Node2D" parent="Body" unique_id=2006521644]
+
+[node name="Sprite2D" type="Sprite2D" parent="Body/Upper-Module" unique_id=1041286989]
+modulate = Color(0.80049086, 0.80049074, 0.80049074, 1)
+z_index = 1
+position = Vector2(-3.0517578e-05, 15)
+scale = Vector2(135.99998, 229.99998)
+texture = SubResource("CanvasTexture_i5eai")
+
+[node name="Sprite2D7" type="Sprite2D" parent="Body/Upper-Module/Sprite2D" unique_id=653745425]
+modulate = Color(0.5211406, 0.52114064, 0.5211403, 1)
+position = Vector2(-0.0073529184, 0.5608696)
+scale = Vector2(0.7969832, 0.12608694)
+texture = SubResource("CanvasTexture_21r20")
+
+[node name="Sprite2D3" type="Sprite2D" parent="Body/Upper-Module/Sprite2D" unique_id=1059877777]
+modulate = Color(0.80049086, 0.80049074, 0.80049074, 1)
+position = Vector2(-1.1838237, -0.03688501)
+scale = Vector2(1.1245676, 0.10855265)
+texture = SubResource("CanvasTexture_i5eai")
+
+[node name="Sprite2D2" type="Sprite2D" parent="Body/Upper-Module/Sprite2D" unique_id=949975245]
+modulate = Color(0.80049086, 0.80049074, 0.80049074, 1)
+position = Vector2(1.147059, -0.015417333)
+scale = Vector2(1.117647, 0.12648669)
+texture = SubResource("CanvasTexture_i5eai")
+
+[node name="Satelites" type="Node2D" parent="Body/Upper-Module" unique_id=313497980]
+position = Vector2(2, -2)
+
+[node name="Anten-Slot-1" type="Sprite2D" parent="Body/Upper-Module/Satelites" unique_id=305175503]
+modulate = Color(0.5211406, 0.52114064, 0.5211403, 1)
+position = Vector2(-35.61026, -155.99998)
+scale = Vector2(82.77942, 78)
+texture = SubResource("CanvasTexture_21r20")
+
+[node name="Anten-Slot-2" type="Sprite2D" parent="Body/Upper-Module/Satelites" unique_id=1426057162]
+visible = false
+modulate = Color(0.5211406, 0.52114064, 0.5211403, 1)
+position = Vector2(121.38974, -83.999985)
+scale = Vector2(82.77942, 78)
+texture = SubResource("CanvasTexture_21r20")
+
+[node name="Anten-Slot-3" type="Sprite2D" parent="Body/Upper-Module/Satelites" unique_id=1586260037]
+visible = false
+modulate = Color(0.5211406, 0.52114064, 0.5211403, 1)
+position = Vector2(-127.610214, -66.99997)
+scale = Vector2(82.77942, 78)
+texture = SubResource("CanvasTexture_21r20")
+
+[node name="Anten-Slot-4" type="Sprite2D" parent="Body/Upper-Module/Satelites" unique_id=1855465300]
+visible = false
+modulate = Color(0.5211406, 0.52114064, 0.5211403, 1)
+position = Vector2(143.38974, 92.000015)
+scale = Vector2(82.77942, 78)
+texture = SubResource("CanvasTexture_21r20")
+
+[node name="Anten-Slot-5" type="Sprite2D" parent="Body/Upper-Module/Satelites" unique_id=506679127]
+visible = false
+modulate = Color(0.5211406, 0.52114064, 0.5211403, 1)
+position = Vector2(-139.61024, 96.000015)
+scale = Vector2(82.77942, 78)
+texture = SubResource("CanvasTexture_21r20")
+
+[node name="Upper-Module2" type="Node2D" parent="Body" unique_id=1491356256]
+visible = false
+position = Vector2(0, 260)
+
+[node name="Sprite2D" type="Sprite2D" parent="Body/Upper-Module2" unique_id=1275230044]
+modulate = Color(0.80049086, 0.80049074, 0.80049074, 1)
+z_index = 1
+position = Vector2(-3.0517578e-05, 15)
+scale = Vector2(135.99998, 229.99998)
+texture = SubResource("CanvasTexture_i5eai")
+
+[node name="Sprite2D7" type="Sprite2D" parent="Body/Upper-Module2/Sprite2D" unique_id=1273351775]
+modulate = Color(0.5211406, 0.52114064, 0.5211403, 1)
+position = Vector2(-0.0073529184, 0.5608696)
+scale = Vector2(0.7969832, 0.12608694)
+texture = SubResource("CanvasTexture_21r20")
+
+[node name="Sprite2D3" type="Sprite2D" parent="Body/Upper-Module2/Sprite2D" unique_id=1341973121]
+modulate = Color(0.80049086, 0.80049074, 0.80049074, 1)
+position = Vector2(-1.1838237, -0.03688501)
+scale = Vector2(1.1245676, 0.10855265)
+texture = SubResource("CanvasTexture_i5eai")
+
+[node name="Sprite2D2" type="Sprite2D" parent="Body/Upper-Module2/Sprite2D" unique_id=731481062]
+modulate = Color(0.80049086, 0.80049074, 0.80049074, 1)
+position = Vector2(1.147059, -0.015417333)
+scale = Vector2(1.117647, 0.12648669)
+texture = SubResource("CanvasTexture_i5eai")
+
+[node name="Satelites" type="Node2D" parent="Body/Upper-Module2" unique_id=2060283443]
+position = Vector2(2, -2)
+
+[node name="Sprite2D4" type="Sprite2D" parent="Body/Upper-Module2/Satelites" unique_id=569955166]
+modulate = Color(0.5211406, 0.52114064, 0.5211403, 1)
+position = Vector2(121.38974, -83.999985)
+scale = Vector2(82.77942, 78)
+texture = SubResource("CanvasTexture_21r20")
+
+[node name="Sprite2D5" type="Sprite2D" parent="Body/Upper-Module2/Satelites" unique_id=79128762]
+modulate = Color(0.5211406, 0.52114064, 0.5211403, 1)
+position = Vector2(-127.610214, -66.99997)
+scale = Vector2(82.77942, 78)
+texture = SubResource("CanvasTexture_21r20")
+
+[node name="Sprite2D6" type="Sprite2D" parent="Body/Upper-Module2/Satelites" unique_id=474359689]
+modulate = Color(0.5211406, 0.52114064, 0.5211403, 1)
+position = Vector2(143.38974, 92.000015)
+scale = Vector2(82.77942, 78)
+texture = SubResource("CanvasTexture_21r20")
+
+[node name="Sprite2D7" type="Sprite2D" parent="Body/Upper-Module2/Satelites" unique_id=942373920]
+modulate = Color(0.5211406, 0.52114064, 0.5211403, 1)
+position = Vector2(-139.61024, 96.000015)
+scale = Vector2(82.77942, 78)
+texture = SubResource("CanvasTexture_21r20")
+
+[node name="Upper-Module3" type="Node2D" parent="Body" unique_id=510547884]
+visible = false
+position = Vector2(0, 516)
+
+[node name="Sprite2D" type="Sprite2D" parent="Body/Upper-Module3" unique_id=676494251]
+modulate = Color(0.80049086, 0.80049074, 0.80049074, 1)
+z_index = 1
+position = Vector2(-3.0517578e-05, 15)
+scale = Vector2(135.99998, 229.99998)
+texture = SubResource("CanvasTexture_i5eai")
+
+[node name="Sprite2D7" type="Sprite2D" parent="Body/Upper-Module3/Sprite2D" unique_id=1991989627]
+modulate = Color(0.5211406, 0.52114064, 0.5211403, 1)
+position = Vector2(-0.0073529184, 0.5608696)
+scale = Vector2(0.7969832, 0.12608694)
+texture = SubResource("CanvasTexture_21r20")
+
+[node name="Sprite2D3" type="Sprite2D" parent="Body/Upper-Module3/Sprite2D" unique_id=1568811819]
+modulate = Color(0.80049086, 0.80049074, 0.80049074, 1)
+position = Vector2(-1.1838237, -0.03688501)
+scale = Vector2(1.1245676, 0.10855265)
+texture = SubResource("CanvasTexture_i5eai")
+
+[node name="Sprite2D2" type="Sprite2D" parent="Body/Upper-Module3/Sprite2D" unique_id=488708335]
+modulate = Color(0.80049086, 0.80049074, 0.80049074, 1)
+position = Vector2(1.147059, -0.015417333)
+scale = Vector2(1.117647, 0.12648669)
+texture = SubResource("CanvasTexture_i5eai")
+
+[node name="Satelites" type="Node2D" parent="Body/Upper-Module3" unique_id=1540809114]
+position = Vector2(2, -2)
+
+[node name="Sprite2D4" type="Sprite2D" parent="Body/Upper-Module3/Satelites" unique_id=1490273044]
+modulate = Color(0.5211406, 0.52114064, 0.5211403, 1)
+position = Vector2(121.38974, -83.999985)
+scale = Vector2(82.77942, 78)
+texture = SubResource("CanvasTexture_21r20")
+
+[node name="Sprite2D5" type="Sprite2D" parent="Body/Upper-Module3/Satelites" unique_id=607352470]
+modulate = Color(0.5211406, 0.52114064, 0.5211403, 1)
+position = Vector2(-127.610214, -66.99997)
+scale = Vector2(82.77942, 78)
+texture = SubResource("CanvasTexture_21r20")
+
+[node name="Sprite2D6" type="Sprite2D" parent="Body/Upper-Module3/Satelites" unique_id=516090231]
+modulate = Color(0.5211406, 0.52114064, 0.5211403, 1)
+position = Vector2(143.38974, 92.000015)
+scale = Vector2(82.77942, 78)
+texture = SubResource("CanvasTexture_21r20")
+
+[node name="Sprite2D7" type="Sprite2D" parent="Body/Upper-Module3/Satelites" unique_id=760262137]
+modulate = Color(0.5211406, 0.52114064, 0.5211403, 1)
+position = Vector2(-139.61024, 96.000015)
+scale = Vector2(82.77942, 78)
+texture = SubResource("CanvasTexture_21r20")
 
 [node name="Stats" type="Node" parent="." unique_id=1054312761]
 script = ExtResource("2_stats")
@@ -54,25 +264,34 @@ stats = {
 &"speed": 7.66
 }
 stat_meta = {
+&"credits": {
+"caption": "CREDITS",
+"decimals": 0,
+"hud": true
+},
 &"data_sent": {
 "caption": "DATA SENT",
 "decimals": 0,
+"tab": "DATA",
 "unit": "Mb"
 },
 &"distance_from_earth": {
 "caption": "DISTANCE FROM EARTH",
 "decimals": 0,
+"hud": true,
 "secondary_conversion": "km_to_au",
 "secondary_unit": "AU",
 "secondary_whole_numbers": true,
 "unit": "km"
 },
 &"name": {
-"caption": "NAME"
+"caption": "NAME",
+"hud": true
 },
 &"speed": {
 "caption": "SPEED",
 "decimals": 1,
+"tab": "FLIGHT",
 "unit": "km/s"
 }
 }
@@ -83,8 +302,12 @@ upgrades = Array[ExtResource("4_1ercd")]([ExtResource("6_thruster"), ExtResource
 
 [node name="Parts" type="Node" parent="." unique_id=1539920464]
 script = ExtResource("11_parts")
-parts = Array[ExtResource("12_partdef")]([ExtResource("13_panel"), ExtResource("14_cargo"), ExtResource("15_main_thruster"), ExtResource("16_radio"), ExtResource("17_radiation"), ExtResource("18_gain")])
+parts = Array[ExtResource("12_partdef")]([ExtResource("13_radio"), ExtResource("14_particle"), ExtResource("15_panels")])
 currency_stat = &"credits"
+
+[node name="Slots" type="Node" parent="."]
+script = ExtResource("31_slots")
+slot_count = 5
 
 [node name="Appearance" type="Node" parent="." unique_id=176231078]
 script = ExtResource("4_appearance")
@@ -99,3 +322,8 @@ script = ExtResource("9_motion")
 
 [node name="Downlink" type="Node" parent="." unique_id=1937460285]
 script = ExtResource("19_downlink")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1416918077]
+libraries/ = SubResource("AnimationLibrary_i5eai")
+autoplay = &"idle"
+speed_scale = 0.1

@@ -1,0 +1,138 @@
+[gd_scene format=3 uid="uid://24fgk4dmbk2x"]
+
+[ext_resource type="Script" uid="uid://biii5bx5a3sfs" path="res://scripts/ui/event_log.gd" id="1_log"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_frame"]
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 8.0
+bg_color = Color(0.0588235, 0.0627451, 0.0862745, 0.588235)
+border_width_left = 2
+border_color = Color(0.239216, 0.270588, 0.380392, 0.784314)
+corner_radius_top_left = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_scroll"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_toggle"]
+content_margin_left = 10.0
+content_margin_top = 4.0
+content_margin_right = 10.0
+content_margin_bottom = 4.0
+bg_color = Color(0.0588235, 0.0627451, 0.0862745, 0.588235)
+border_width_left = 2
+border_color = Color(0.239216, 0.270588, 0.380392, 0.784314)
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_toggle_press"]
+content_margin_left = 10.0
+content_margin_top = 4.0
+content_margin_right = 10.0
+content_margin_bottom = 4.0
+bg_color = Color(0.180392, 0.203922, 0.290196, 0.898039)
+border_width_left = 2
+border_color = Color(0.478431, 0.533333, 0.701961, 0.784314)
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_toggle_hover"]
+content_margin_left = 10.0
+content_margin_top = 4.0
+content_margin_right = 10.0
+content_margin_bottom = 4.0
+bg_color = Color(0.129412, 0.145098, 0.211765, 0.784314)
+border_width_left = 2
+border_color = Color(0.478431, 0.533333, 0.701961, 0.784314)
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dismiss_press"]
+content_margin_left = 8.0
+content_margin_top = 4.0
+content_margin_right = 8.0
+content_margin_bottom = 4.0
+bg_color = Color(0.180392, 0.203922, 0.290196, 0.898039)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dismiss_hover"]
+content_margin_left = 8.0
+content_margin_top = 4.0
+content_margin_right = 8.0
+content_margin_bottom = 4.0
+bg_color = Color(0.129412, 0.145098, 0.211765, 0.784314)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_dismiss"]
+
+[node name="EventLog" type="CanvasLayer" unique_id=1508714787]
+layer = 9
+script = ExtResource("1_log")
+
+[node name="Frame" type="PanelContainer" parent="." unique_id=1845521114]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -287.0
+offset_right = 456.0
+offset_bottom = -103.0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_frame")
+
+[node name="Scroll" type="ScrollContainer" parent="Frame" unique_id=550034965]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxEmpty_scroll")
+horizontal_scroll_mode = 0
+
+[node name="Lines" type="VBoxContainer" parent="Frame/Scroll" unique_id=1808893049]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="Toggle" type="Button" parent="." unique_id=1864122577]
+unique_name_in_owner = true
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 17.0
+offset_top = -101.0
+offset_right = 56.0
+offset_bottom = -77.0
+grow_vertical = 0
+focus_mode = 0
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("StyleBoxFlat_toggle")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_toggle_press")
+theme_override_styles/hover = SubResource("StyleBoxFlat_toggle_hover")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_scroll")
+text = "Log"
+
+[node name="Dismiss" type="Button" parent="." unique_id=1085581929]
+unique_name_in_owner = true
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 88.0
+offset_top = -101.0
+offset_right = 133.0
+offset_bottom = -77.0
+grow_vertical = 0
+tooltip_text = "Hide the log until the next line."
+focus_mode = 0
+theme_override_colors/font_color = Color(0.552941, 0.6, 0.705882, 1)
+theme_override_colors/font_pressed_color = Color(0.85, 0.89, 1, 1)
+theme_override_colors/font_hover_color = Color(0.85, 0.89, 1, 1)
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("StyleBoxFlat_toggle")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_dismiss_press")
+theme_override_styles/hover = SubResource("StyleBoxFlat_dismiss_hover")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_dismiss")
+text = "Hide"

@@ -17,7 +17,7 @@ extends Node2D
 ## # Anywhere in the project:
 ## SatelliteController.stats_changed.connect(_on_stats_changed)
 ## SatelliteController.purchase_upgrade(&"thruster")
-## SatelliteController.purchase_part(&"solar_panel")
+## SatelliteController.purchase_part(&"solar_panels")
 ## [/codeblock]
 
 signal stats_changed(snapshot: Dictionary)
@@ -25,6 +25,9 @@ signal upgrade_purchased(upgrade: Resource, level: int)
 signal upgrades_changed()
 signal part_purchased(part: Resource, owned: int)
 signal parts_changed()
+## What is fitted to which mount changed. [param slot] is -1 when the whole arrangement
+## did, which is what a slot count change and a save load report.
+signal slots_changed(slot: int)
 signal appearance_changed(snapshot: Dictionary)
 signal action_performed(action: Resource)
 signal data_transmitted(packet: Resource, sent_count: int)
@@ -36,16 +39,21 @@ signal downlink_changed()
 var _stats: SatelliteStats = null
 var _upgrades: SatelliteUpgrades = null
 var _parts: SatelliteParts = null
+var _slots: SatelliteSlots = null
 var _appearance: SatelliteAppearance = null
 var _actions: SatelliteActions = null
 var _motion: SatelliteMotion = null
 var _downlink: SatelliteDownlink = null
+## The control panel, found by contract rather than by type: it is an optional module with no
+## class name, and this aggregate would otherwise have to import it.
+var _control_panel: Node = null
 
 
 func _ready() -> void:
 	_collect_modules()
 	_bind_modules()
 	_republish()
+	_push_antenna_counts()
 	_emit_stats()
 	SatelliteController.register(self)
 
@@ -86,6 +94,12 @@ func motion() -> SatelliteMotion:
 
 func downlink() -> SatelliteDownlink:
 	return _downlink
+
+
+## The satellite's control panel, or null when it has none. Typed as [Node] because it is
+## addressed by contract: [method Object.has_method] on [code]"set_antenna_counts"[/code].
+func control_panel() -> Node:
+	return _control_panel
 
 
 # --- Contract: stats -------------------------------------------------------
@@ -156,6 +170,51 @@ func can_purchase_part(part_id: StringName) -> bool:
 
 func purchase_part(part_id: StringName) -> bool:
 	return _parts.purchase(part_id) if _parts != null else false
+
+
+## One entry per mount, in order: what is fitted there and where on the body it sits.
+func slot_states() -> Array:
+	return _slots.slots() if _slots != null else []
+
+
+func available_slots() -> int:
+	return _slots.available_slots() if _slots != null else 0
+
+
+## Fits [param part_id] into [param slot], replacing whatever was fitted there. Reports
+## whether it happened; what it replaced is on [signal SatelliteSlots.part_fitted].
+##
+## Each copy bought can be fitted in its own mount, so fitting a part the satellite already
+## carries mounts another copy rather than moving the first one.
+func fit_part(part_id: StringName, slot: int) -> bool:
+	return _slots != null and _slots.fit(part_id, slot)
+
+
+## Empties [param slot] and returns what was in it, or null. The part stays bought.
+func unfit_part(slot: int) -> Resource:
+	return _slots.clear(slot) if _slots != null else null
+
+
+## Which mount [param part_id] is fitted to, or -1 when it is fitted nowhere. The lowest of
+## the mounts when it is fitted to several; [method slots_of_part] is the whole list.
+func slot_of_part(part_id: StringName) -> int:
+	return _slots.slot_of(part_id) if _slots != null else -1
+
+
+## Every mount [param part_id] is fitted to, in order. Empty when it is fitted nowhere.
+func slots_of_part(part_id: StringName) -> Array:
+	return _slots.slots_of(part_id) if _slots != null else []
+
+
+## How many copies of [param part_id] are fitted, which is at most how many were bought.
+func fitted_count_of_part(part_id: StringName) -> int:
+	return _slots.fitted_count_of(part_id) if _slots != null else 0
+
+
+## Whether another copy of [param part_id] could be fitted as it is, without moving one that
+## already is.
+func can_fit_part(part_id: StringName) -> bool:
+	return _slots != null and _slots.can_fit(part_id)
 
 
 # --- Contract: actions -----------------------------------------------------
@@ -236,6 +295,7 @@ func save_data() -> Dictionary:
 		"stats": _stats.snapshot() if _stats != null else {},
 		"upgrades": _upgrades.levels_snapshot() if _upgrades != null else {},
 		"parts": _parts.owned_snapshot() if _parts != null else {},
+		"slots": _slots.slot_snapshot() if _slots != null else {},
 		"actions": actions if _actions != null else {},
 		"appearance": _appearance.snapshot() if _appearance != null else {},
 		"downlink": _downlink.sent_snapshot() if _downlink != null else {},
@@ -259,6 +319,9 @@ func load_data(data: Dictionary) -> void:
 		_upgrades.restore_levels(_as_dictionary(data.get("upgrades")))
 	if _parts != null:
 		_parts.restore_owned(_as_dictionary(data.get("parts")))
+	# After the parts, because a mount is only restored to a part the catalogue still has.
+	if _slots != null:
+		_slots.restore_slots(_as_dictionary(data.get("slots")))
 	if _actions != null:
 		var actions := _as_dictionary(data.get("actions"))
 		_actions.restore(actions.get("granted", []), actions.get("cooldowns", {}))
@@ -284,6 +347,8 @@ func _collect_modules() -> void:
 			_upgrades = child as SatelliteUpgrades
 		elif child is SatelliteParts:
 			_parts = child as SatelliteParts
+		elif child is SatelliteSlots:
+			_slots = child as SatelliteSlots
 		elif child is SatelliteAppearance:
 			_appearance = child as SatelliteAppearance
 		elif child is SatelliteActions:
@@ -292,6 +357,8 @@ func _collect_modules() -> void:
 			_motion = child as SatelliteMotion
 		elif child is SatelliteDownlink:
 			_downlink = child as SatelliteDownlink
+		elif child.has_method(&"set_antenna_counts"):
+			_control_panel = child
 
 
 func _bind_modules() -> void:
@@ -305,6 +372,9 @@ func _bind_modules() -> void:
 		_upgrades.bind(_stats, _appearance, _actions)
 	if _parts != null:
 		_parts.bind(_stats, _appearance, _actions)
+	# After the parts, so a mount can be matched against a part that is already there.
+	if _slots != null:
+		_slots.bind(_parts)
 
 
 func _republish() -> void:
@@ -316,6 +386,8 @@ func _republish() -> void:
 	if _parts != null:
 		_parts.part_purchased.connect(_on_part_purchased)
 		_parts.parts_changed.connect(_on_parts_changed)
+	if _slots != null:
+		_slots.slots_changed.connect(_on_slots_changed)
 	if _appearance != null:
 		_appearance.appearance_changed.connect(_on_appearance_changed)
 	if _actions != null:
@@ -343,11 +415,32 @@ func _on_upgrades_changed() -> void:
 
 
 func _on_part_purchased(part: Resource, owned: int) -> void:
+	# A new antenna listens as soon as it is bought, before it is fitted anywhere, so the
+	# panel hears with the hardware the player just paid for rather than waiting for a
+	# mount to be chosen. Parts with no channel are not antennas and do nothing here.
+	if _control_panel != null and _control_panel.has_method(&"detect_new_anten"):
+		_control_panel.call(&"detect_new_anten", part)
 	part_purchased.emit(part, owned)
 
 
 func _on_parts_changed() -> void:
 	parts_changed.emit()
+
+
+func _on_slots_changed(slot: int) -> void:
+	_push_antenna_counts()
+	slots_changed.emit(slot)
+
+
+## Tells the control panel how many pieces of hardware it has per channel, counted off the
+## mounts rather than off what was bought: one mount is one antenna, so a part fitted twice
+## is two, and one that was bought but never mounted is none.
+##
+## The panel is optional and answered by contract, so a satellite without one loses nothing.
+func _push_antenna_counts() -> void:
+	if _slots == null or _control_panel == null:
+		return
+	_control_panel.call(&"set_antenna_counts", _slots.antenna_counts())
 
 
 func _on_appearance_changed(snapshot: Dictionary) -> void:

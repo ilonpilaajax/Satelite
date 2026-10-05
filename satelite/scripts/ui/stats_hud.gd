@@ -9,6 +9,11 @@ extends CanvasLayer
 ## the conversion between them come from the satellite's [code]stat_meta[/code], so the
 ## formatting lives next to the definition rather than in the UI.
 ##
+## Shows only the stats whose [code]stat_meta[/code] asks to be on the hud. The stats
+## menu lists the rest, and the two split the set between them rather than each keeping
+## a list, so a stat cannot turn up in both or in neither. That is what keeps this bar
+## to the handful of numbers worth seeing without opening a menu.
+##
 ## The only thing this script knows about the satellite layer is one method on
 ## the hub and two signals, so the readout keeps working for any satellite.
 ##
@@ -22,9 +27,10 @@ const VALUE_FONT_SIZE := 16
 ## Reads from [code]SatelliteController[/code] instead of being fed by hand.
 @export var follow_active_satellite: bool = true
 
-## Cells per row. Lower it when a satellite tracks many stats so the bar grows
-## downwards instead of squeezing every caption.
-@export_range(1, 4) var columns: int = 2
+## Cells per row. The bar reads as one line of numbers along the top, so this is set to
+## the number of stats that fit there and lowered only when a satellite tracks enough to
+## make the captions squeeze - at which point the bar grows downwards instead.
+@export_range(1, 4) var columns: int = 3
 
 @onready var _top_bar: PanelContainer = $TopBar
 @onready var _grid: GridContainer = $TopBar/Grid
@@ -35,7 +41,6 @@ var _current_ids: Array = []
 
 func _ready() -> void:
 	_top_bar.visible = false
-	_grid.columns = columns
 	if follow_active_satellite:
 		SatelliteController.active_changed.connect(_on_active_changed)
 		SatelliteController.stats_changed.connect(_on_stats_changed)
@@ -58,30 +63,49 @@ func _on_stats_changed(_snapshot: Dictionary) -> void:
 ## Rebuilds the cells only when the set of stats changed; otherwise this just
 ## rewrites text, so a value ticking every frame allocates nothing.
 func _refresh(descriptors: Array) -> void:
+	# Filtered first, so the "did the set change" test below compares like with like: a
+	# satellite that only moves stats between the bar and the menu rebuilds exactly once.
+	var shown := _bar_descriptors(descriptors)
 	var ids: Array = []
-	for descriptor: Variant in descriptors:
+	for descriptor: Variant in shown:
 		if descriptor is Dictionary:
 			ids.append((descriptor as Dictionary).get("id"))
 
 	if ids != _current_ids:
-		_rebuild(descriptors)
+		_rebuild(shown)
 		_current_ids = ids
 
-	for descriptor: Variant in descriptors:
+	for descriptor: Variant in shown:
 		if not (descriptor is Dictionary):
 			continue
 		var data: Dictionary = descriptor
 		var label: Variant = _value_labels.get(data.get("id"))
 		if label is Label:
-			(label as Label).text = _format(data)
+			(label as Label).text = SatelliteStats.format_value(data)
 
 	_top_bar.visible = not _current_ids.is_empty()
+
+
+## The descriptors this bar is responsible for: the ones whose [code]stat_meta[/code]
+## asks for the hud. Everything else is the stats menu's, which is what stops a stat
+## being listed twice.
+func _bar_descriptors(descriptors: Array) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for descriptor: Variant in descriptors:
+		if descriptor is Dictionary and bool((descriptor as Dictionary).get("hud", false)):
+			result.append(descriptor as Dictionary)
+	return result
 
 
 ## Cells are detached before being freed. [method Node.queue_free] would leave
 ## them in the container until the end of the frame, and the bar sizes itself from
 ## its content, so it would briefly measure the old and new cells together.
 func _rebuild(descriptors: Array) -> void:
+	# Never more columns than there are cells: a grid left at three columns with two
+	# numbers in it leaves a hole at the end of the row, so the bar reads as padded out
+	# rather than as the numbers it has.
+	_grid.columns = maxi(mini(columns, descriptors.size()), 1)
+
 	for child in _grid.get_children():
 		_grid.remove_child(child)
 		child.queue_free()
@@ -106,7 +130,9 @@ func _add_cell(descriptor: Dictionary) -> void:
 	var value := Label.new()
 	value.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	value.clip_text = true
-	value.text = _format(descriptor)
+	# The same formatter the stats menu uses, so a number cannot read differently in the
+	# two places it appears. See [method SatelliteStats.format_value].
+	value.text = SatelliteStats.format_value(descriptor)
 	value.add_theme_font_size_override(&"font_size", VALUE_FONT_SIZE)
 	value.add_theme_color_override(&"font_color", VALUE_COLOR)
 
@@ -114,34 +140,3 @@ func _add_cell(descriptor: Dictionary) -> void:
 	cell.add_child(value)
 	_grid.add_child(cell)
 	_value_labels[descriptor.get("id")] = value
-
-
-## Renders a stat as its secondary unit first, then its own: "0.00000006 AU / 9 km".
-## The secondary unit comes first because that is the order the readout was asked for,
-## and because a stat with a secondary unit is being read at two scales at once, coarse
-## to fine.
-##
-## The secondary block is derived from the same tracked value the primary one shows,
-## computed by [SatelliteStats], so the two can never disagree. A readout with no
-## secondary unit is unchanged and shows only its own.
-func _format(descriptor: Dictionary) -> String:
-	var primary := _format_in(descriptor.get("value"), str(descriptor.get("unit", "")), int(descriptor.get("decimals", 1)))
-	var secondary: Variant = descriptor.get("secondary")
-	if not (secondary is Dictionary):
-		return primary
-	var alt: Dictionary = secondary
-	var alt_unit := str(alt.get("unit", ""))
-	if alt_unit.is_empty():
-		return primary
-	return "%s / %s" % [_format_in(alt.get("value"), alt_unit, int(alt.get("decimals", 1))), primary]
-
-
-func _format_in(value: Variant, unit: String, decimals: int) -> String:
-	var text: String
-	if value is float:
-		text = String.num(float(value), decimals)
-	elif value is int:
-		text = str(value)
-	else:
-		text = str(value)
-	return "%s %s" % [text, unit] if not unit.is_empty() else text
