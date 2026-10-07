@@ -29,6 +29,7 @@ extends Node
 signal active_changed(satellite: Node)
 signal stats_changed(snapshot: Dictionary)
 signal upgrade_purchased(upgrade: Resource, level: int)
+signal upgrade_purchase_rejected(upgrade: Resource, reason: StringName)
 signal upgrades_changed()
 signal part_purchased(part: Resource, owned: int)
 signal parts_changed()
@@ -53,6 +54,7 @@ const SAVE_KEY := &"satellite"
 const BOUND_SIGNALS: Array[StringName] = [
 	&"stats_changed",
 	&"upgrade_purchased",
+	&"upgrade_purchase_rejected",
 	&"upgrades_changed",
 	&"part_purchased",
 	&"parts_changed",
@@ -157,6 +159,13 @@ func can_purchase(upgrade_id: StringName) -> bool:
 	return _as_bool(_call_active(&"can_purchase", [upgrade_id]))
 
 
+## Why [param upgrade_id] cannot be bought right now, or empty when it can. What a menu row
+## shows on its disabled button, so the rule stays in one place.
+func upgrade_purchase_reason(upgrade_id: StringName) -> StringName:
+	var reason: Variant = _call_active(&"upgrade_purchase_reason", [upgrade_id])
+	return StringName(reason) if reason != null else &""
+
+
 func purchase_upgrade(upgrade_id: StringName) -> bool:
 	return _as_bool(_call_active(&"purchase_upgrade", [upgrade_id]))
 
@@ -248,6 +257,18 @@ func can_fit_part(part_id: StringName) -> bool:
 	return _as_bool(_call_active(&"can_fit_part", [part_id]))
 
 
+## Seconds of setup left on [param slot], or 0 when the mount is empty or already working. An
+## antenna takes a minute to come up after it is fitted, and counts for nothing until then.
+func install_remaining(slot: int) -> float:
+	var value: Variant = _call_active(&"install_remaining", [slot])
+	return float(value) if (value is float or value is int) else 0.0
+
+
+## Whether [param slot] holds hardware that is fitted and finished being set up.
+func is_installed(slot: int) -> bool:
+	return _as_bool(_call_active(&"is_installed", [slot]))
+
+
 # --- Actions ---------------------------------------------------------------
 
 func action_catalogue() -> Array:
@@ -310,6 +331,26 @@ func set_distance_accrual(enabled: bool) -> void:
 	_call_active(&"set_distance_accrual", [enabled])
 
 
+# --- Config ----------------------------------------------------------------
+
+## The active satellite's configuration: {position, strength, memory, type}.
+## What the config menu shows, so the screen always describes the satellite
+## in focus rather than whichever one it happened to open on.
+func config_snapshot() -> Dictionary:
+	var result: Variant = _call_active(&"config_snapshot")
+	return (result as Dictionary) if result is Dictionary else {}
+
+
+# --- Antennas --------------------------------------------------------------
+
+## Every antenna of the active satellite as {channel: {type, count, strength,
+## range}}. What a screen that configures antennas is built from: each entry
+## carries the antenna's type and its own settings.
+func antenna_configs() -> Dictionary:
+	var result: Variant = _call_active(&"antenna_configs")
+	return (result as Dictionary) if result is Dictionary else {}
+
+
 # --- Signal plumbing -------------------------------------------------------
 
 ## Hands the active satellite to [code]SaveManager[/code] under [constant
@@ -351,6 +392,7 @@ func _handler_for(signal_name: StringName) -> Callable:
 	match signal_name:
 		&"stats_changed": return _on_stats_changed
 		&"upgrade_purchased": return _on_upgrade_purchased
+		&"upgrade_purchase_rejected": return _on_upgrade_rejected
 		&"upgrades_changed": return _on_upgrades_changed
 		&"part_purchased": return _on_part_purchased
 		&"parts_changed": return _on_parts_changed
@@ -391,6 +433,10 @@ func _push_stats(snapshot: Dictionary) -> void:
 
 func _on_upgrade_purchased(upgrade: Resource, level: int) -> void:
 	upgrade_purchased.emit(upgrade, level)
+
+
+func _on_upgrade_rejected(upgrade: Resource, reason: StringName) -> void:
+	upgrade_purchase_rejected.emit(upgrade, reason)
 
 
 func _on_upgrades_changed() -> void:

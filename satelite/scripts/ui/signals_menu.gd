@@ -19,7 +19,9 @@ extends MenuPanel
 ##
 ## A row shows the signal's icon, its name, its type, and the signal's own readings -
 ## frequency, bandwidth, dose rate, whatever that particular signal carries - plus the
-## strength it came in at and how many times it has been heard.
+## strength it came in at. Every hearing is a row of its own, and each row carries an
+## ACCEPT button that hands that one hearing to the downlink, where it can be sent for
+## the points the signal is worth.
 
 ## Shown when there is no satellite to read.
 @export var empty_message: String = "No satellite is selected."
@@ -353,8 +355,32 @@ func _build_row(row: Dictionary) -> Control:
 		info.add_child(detail)
 
 	columns.add_child(info)
+
+	var accept := _accept_button(row)
+	if accept != null:
+		columns.add_child(accept)
+
 	panel.add_child(columns)
 	return panel
+
+
+## The button that hands this hearing to the downlink. One
+## per row rather than one per list, because a hearing is
+## accepted where it is listed. Disabled once accepted: a
+## hearing is accepted once, and the downlink is where it
+## goes from there.
+func _accept_button(row: Dictionary) -> Button:
+	var key := StringName(row.get("key", &""))
+	if key.is_empty():
+		return null
+	var accepted := bool(row.get("accepted", false))
+	var button := Button.new()
+	button.text = "ACCEPTED" if accepted else "ACCEPT"
+	button.disabled = accepted
+	button.tooltip_text = "Already handed to the downlink." if accepted \
+		else "Hand this signal to the downlink, where it can be sent for points."
+	button.pressed.connect(_on_accept_pressed.bind(key, _selected_id))
+	return button
 
 
 ## The signal's own readings, in the order the definition declared them, so a carrier
@@ -420,6 +446,19 @@ func _add_more(hidden: int) -> void:
 func _set_status(text: String) -> void:
 	if _status_label:
 		_status_label.text = text
+
+
+## Accepting a hearing asks the panel, which owns the
+## findings. The panel announces it through
+## [code]signals_changed[/code], so the list rebuilds
+## with the row showing ACCEPTED and the downlink has
+## the signal without this menu knowing anything about it.
+func _on_accept_pressed(key: StringName, channel: StringName) -> void:
+	if _panel == null or key.is_empty() or channel.is_empty():
+		return
+	var accepted: Variant = _panel.call(&"accept_finding", channel, key)
+	_set_status("Accepted. It has gone to the downlink." if accepted \
+		else "That one is already accepted.")
 
 
 # --- Signals ----------------------------------------------------------------

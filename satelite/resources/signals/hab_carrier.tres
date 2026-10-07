@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="SignalDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="SignalDefinition" format=3 uid="uid://b8y07k6r8cqgq"]
 
-[ext_resource type="Script" path="res://scripts/systems/satellite/signal_definition.gd" id="1_sigdef"]
+[ext_resource type="Script" uid="uid://51gghjg5q413" path="res://scripts/systems/satellite/signal_definition.gd" id="1_sigdef"]
 
 [resource]
 script = ExtResource("1_sigdef")
@@ -9,6 +9,7 @@ display_name = "Hab carrier"
 signal_type = &"carrier"
 channel = &"radio"
 description = "A continuous tone on the downlink band. Somebody is transmitting."
+points = 10
 details = {
 &"Bandwidth": "125 kHz",
 &"Frequency": "145.800 MHz",

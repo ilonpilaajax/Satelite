@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="SignalDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="SignalDefinition" format=3 uid="uid://0bct8rnyvrju"]
 
-[ext_resource type="Script" path="res://scripts/systems/satellite/signal_definition.gd" id="1_sigdef"]
+[ext_resource type="Script" uid="uid://51gghjg5q413" path="res://scripts/systems/satellite/signal_definition.gd" id="1_sigdef"]
 
 [resource]
 script = ExtResource("1_sigdef")
@@ -9,6 +9,7 @@ display_name = "Solar flux alert"
 signal_type = &"alert"
 channel = &"radiation"
 description = "The sun is doing something. Panels should be stowed."
+points = 30
 details = {
 &"Dose rate": "12.0 mSv/h",
 &"Source": "geomagnetic"

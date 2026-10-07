@@ -597,7 +597,13 @@ func _on_action_performed(action: Resource) -> void:
 
 
 func _on_data_transmitted(packet: Resource, _count: int) -> void:
-	post("Downlinked %s." % _resource_text(packet, "display_name", "data"), &"downlink")
+	var line := "Downlinked %s." % _resource_text(packet, "display_name", "data")
+	# A signal carries the points it pays out, which a data packet does
+	# not, so the line says what arrived as well as what went down.
+	var points := int(packet.get(&"points")) if packet != null else 0
+	if points > 0:
+		line = "%s  (+%d points)" % [line, points]
+	post(line, &"downlink")
 
 
 func _on_active_changed(_satellite: Node) -> void:

@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="SignalDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="SignalDefinition" format=3 uid="uid://ckny341whlk2f"]
 
-[ext_resource type="Script" path="res://scripts/systems/satellite/signal_definition.gd" id="1_sigdef"]
+[ext_resource type="Script" uid="uid://51gghjg5q413" path="res://scripts/systems/satellite/signal_definition.gd" id="1_sigdef"]
 
 [resource]
 script = ExtResource("1_sigdef")
@@ -9,6 +9,7 @@ display_name = "Debris swarm"
 signal_type = &"swarm"
 channel = &"particles"
 description = "A lot of small things, all at once, all going roughly the same way."
+points = 40
 details = {
 &"Density": "high",
 &"Events": "340"

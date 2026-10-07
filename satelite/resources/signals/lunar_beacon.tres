@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="SignalDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="SignalDefinition" format=3 uid="uid://bngigge5ha0p3"]
 
-[ext_resource type="Script" path="res://scripts/systems/satellite/signal_definition.gd" id="1_sigdef"]
+[ext_resource type="Script" uid="uid://51gghjg5q413" path="res://scripts/systems/satellite/signal_definition.gd" id="1_sigdef"]
 
 [resource]
 script = ExtResource("1_sigdef")
@@ -9,6 +9,7 @@ display_name = "Lunar beacon"
 signal_type = &"beacon"
 channel = &"light"
 description = "A steady pulse on a fixed period. Almost certainly artificial."
+points = 25
 details = {
 &"Period": "2.0 s",
 &"Wavelength": "635 nm"

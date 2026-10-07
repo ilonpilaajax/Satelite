@@ -44,6 +44,13 @@ var _row_style: StyleBoxFlat = null
 ## visible and the player can see what they are moving.
 var _picking: StringName = &""
 
+## One entry per copy chip on screen, so [method _process] can repaint the countdowns without
+## rebuilding the rows they live in.
+var _chips: Array[Dictionary] = []
+## Seconds since the chips were last repainted. Half a second, so the countdown reads as
+## whole seconds without repainting on every frame.
+var _since_tick: float = 0.0
+
 @onready var _list_box: VBoxContainer = get_node_or_null("%List")
 @onready var _wallet_label: Label = get_node_or_null("%Wallet")
 @onready var _placeholder: Label = get_node_or_null("%ContentPlaceholder")
@@ -150,6 +157,9 @@ func _signature_of(catalogue: Array) -> String:
 ## the new ones for a frame.
 func _detach_rows() -> void:
 	_detach(_list_box)
+	# The chips are children of the rows just freed, so the bookkeeping that repaints their
+	# countdowns goes with them.
+	_chips.clear()
 
 
 ## Same reasoning for any rebuilt container, the slot buttons among them.
@@ -196,16 +206,16 @@ func _build_row(row: Dictionary) -> Control:
 	if category != &"":
 		title.add_child(_tag(str(category).to_upper()))
 
-	var fitted := _fitted_tag(row)
-	if not fitted.is_empty():
-		title.add_child(_tag(fitted))
-
-	# Where it is mounted. Every mount it is in, because a part bought more than once is
-	# fitted to more than one. Shown for a part bought but not mounted too, which is the
-	# difference between "bought" and "fitted somewhere".
-	title.add_child(_tag(_mount_tag(part_id)))
-
 	info.add_child(title)
+
+	var chips := HBoxContainer.new()
+	chips.add_theme_constant_override(&"separation", 4)
+	# One chip per copy bought, so the row says what the player actually has instead of
+	# cramming a count into a tag: each chip is one piece of hardware and names the mount it
+	# is in, or says it is still in store.
+	for index: int in int(row.get("owned", 0)):
+		chips.add_child(_build_chip(part_id, index))
+	info.add_child(chips)
 
 	if not reason.is_empty():
 		var note := Label.new()
@@ -244,7 +254,7 @@ func _build_row(row: Dictionary) -> Control:
 	return panel
 
 
-## Small dim label used for the category and the fitted count.
+## Small dim label used for the category and the copy count.
 func _tag(text: String) -> Label:
 	var label := Label.new()
 	label.text = text
@@ -252,36 +262,81 @@ func _tag(text: String) -> Label:
 	return label
 
 
-## How much of the part is actually on the satellite, as one tag. Two numbers rather than
-## one because they answer different questions: "FITTED 2/4" is what the satellite has, and
-## what is left in the store is said separately. Empty for a part that can only be fitted
-## once, which would carry a counter nobody needs.
-func _fitted_tag(row: Dictionary) -> String:
-	if str(row.get("fitted_label", "")).is_empty():
-		return ""
-	var part_id := StringName(row.get("id", &""))
-	var text := "FITTED %d/%d" % [
-		SatelliteController.fitted_count_of_part(part_id),
-		int(row.get("max_owned", 1)),
-	]
-	var in_store := int(row.get("owned", 0)) - SatelliteController.fitted_count_of_part(part_id)
-	if in_store > 0:
-		text += "  ·  %d IN STORE" % in_store
-	return text
+## One chip per copy bought, so each piece of hardware is shown on its own rather than as a
+## count in a tag. A chip says which mount its copy is in, or that it is still in store, and
+## counts down the setup while the copy is being installed.
+##
+## A button because pressing it is the same choice the FIT button offers: put this copy in a
+## mount, or move it to another one.
+func _build_chip(part_id: StringName, copy: int) -> Button:
+	var slot := _mount_of_copy(part_id, copy)
+	var chip := Button.new()
+	chip.custom_minimum_size = Vector2(76, 30)
+	chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	chip.focus_mode = Control.FOCUS_NONE
+	chip.pressed.connect(_on_mount_pressed.bind(part_id))
+	_chip_of(part_id, copy, slot, chip)
+	return chip
 
 
-## Which mounts hold the part: one, several, or none. Reads "NOT FITTED" for a part that is
-## bought but not mounted, which is the difference between owning a part and flying with it.
-func _mount_tag(part_id: StringName) -> String:
+## Which mount [param copy] of [param part_id] is in, or -1 when that copy is in store. Copies
+## are told apart by mount order, so the first copy is the lowest-numbered mount holding the
+## part and a copy with no mount of its own is waiting to be fitted.
+func _mount_of_copy(part_id: StringName, copy: int) -> int:
 	var mounts := SatelliteController.slots_of_part(part_id)
-	if mounts.is_empty():
-		return "NOT FITTED" if SatelliteController.owns_part(part_id) else ""
-	if mounts.size() == 1:
-		return "SLOT %d" % (int(mounts[0]) + 1)
-	var numbers := PackedStringArray()
-	for slot: Variant in mounts:
-		numbers.append(str(int(slot) + 1))
-	return "SLOTS %s" % ", ".join(numbers)
+	return int(mounts[copy]) if copy < mounts.size() else -1
+
+
+## Puts [param chip] into the bookkeeping [method _refresh_chips] uses, and gives it the text
+## it should start with.
+func _chip_of(part_id: StringName, copy: int, slot: int, chip: Button) -> void:
+	_chips.append({"part_id": part_id, "copy": copy, "slot": slot, "button": chip})
+	_refresh_chip(chip, slot)
+
+
+## What a chip says. A copy in store says so; a fitted copy names its mount and, while it is
+## being set up, how long that has left.
+func _refresh_chip(chip: Button, slot: int) -> void:
+	if slot < 0:
+		chip.text = "STORE"
+		chip.tooltip_text = "Bought, not fitted. FIT puts it in a mount."
+		chip.add_theme_color_override(&"font_color", Color(0.561, 0.608, 0.718))
+		return
+	var remaining := SatelliteController.install_remaining(slot)
+	if remaining > 0.0:
+		chip.text = "S%d  %s" % [slot + 1, _countdown(remaining)]
+		chip.tooltip_text = "Being set up in slot %d. %s left, then it starts working." \
+			% [slot + 1, _countdown(remaining)]
+		# Amber while it is still being installed, so a mount that is not yet contributing
+		# does not read the same as one that is.
+		chip.add_theme_color_override(&"font_color", Color(0.98, 0.82, 0.44))
+		return
+	chip.text = "SLOT %d" % (slot + 1)
+	chip.tooltip_text = "Working in slot %d." % (slot + 1)
+	chip.add_theme_color_override(&"font_color", Color(0.62, 0.78, 0.62))
+
+
+## Seconds as [code]m:ss[/code], so a countdown reads as time rather than as a number.
+func _countdown(seconds: float) -> String:
+	var whole := int(ceil(seconds))
+	return "%d:%02d" % [whole / 60, whole % 60]
+
+
+## Refreshes the chips on a timer rather than rebuilding the rows: a countdown changes every
+## second, and rebuilding every row that often to redraw one number would cost far more than
+## writing the text. Off-screen the menu does nothing at all.
+func _process(delta: float) -> void:
+	if not visible or _chips.is_empty():
+		return
+	_since_tick += delta
+	if _since_tick < 0.5:
+		return
+	_since_tick = 0.0
+	for chip: Dictionary in _chips:
+		var button: Variant = chip.get("button")
+		if not is_instance_valid(button):
+			continue
+		_refresh_chip(button as Button, int(chip.get("slot", -1)))
 
 
 ## What the button will do: mount a copy, move a copy, or buy one and then mount it.
@@ -442,13 +497,21 @@ func _build_picker_slots() -> void:
 		var slot := int(entry.get("index", 0))
 		var occupied := bool(entry.get("occupied", false))
 		var holding := str(entry.get("display_name", ""))
+		var remaining := float(entry.get("install_remaining", 0.0))
 
 		var button := Button.new()
 		button.custom_minimum_size = Vector2(0, 56)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		# Three lines when something is being set up there, so the mount says it is not
+		# working yet rather than looking like an ordinary occupied mount.
 		button.text = "SLOT %d\n%s" % [slot + 1, holding if occupied else "empty"]
-		button.tooltip_text = "Replace %s" % holding if occupied else "Fit here"
+		if remaining > 0.0:
+			button.text += "\nsetting up  %s" % _countdown(remaining)
+			button.tooltip_text = "%s is being set up in slot %d, %s left." \
+				% [holding, slot + 1, _countdown(remaining)]
+		else:
+			button.tooltip_text = "Replace %s" % holding if occupied else "Fit here"
 		if occupied:
 			button.add_theme_color_override(&"font_color", Color(0.98, 0.82, 0.44))
 		button.pressed.connect(_on_slot_pressed.bind(slot))
@@ -508,12 +571,13 @@ func _on_catalogue_changed() -> void:
 
 ## Credits moving is what most often flips a row between buyable and not. The
 ## guard inside [method _rebuild] is what keeps this cheap.
+## A mount changed, which is what a fit, a move and a finished setup all report. The chips
+## name their mounts, so they have to be matched to the mounts again; the picker, if it is
+## open, has to be told too.
 func _on_slots_changed(_slot: int) -> void:
-	# Only while the picker is up: a mount moving while the shop is merely being browsed is
-	# a change in the body, not in the list, and the rows do not show mounts.
-	if _picking.is_empty():
-		return
-	_build_picker_slots()
+	_rebuild(true)
+	if not _picking.is_empty():
+		_build_picker_slots()
 
 
 func _on_stats_changed(_snapshot: Dictionary) -> void:

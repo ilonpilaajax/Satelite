@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="UpgradeDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/satellite/upgrade_definition.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"antenna_focus"
+display_name = "Antenna Focus"
+description = "A narrower listen. Each level shrinks the window a channel scans, so what it hears is more likely to be found."
+max_level = 3
+base_cost = 45
+cost_growth = 1.4

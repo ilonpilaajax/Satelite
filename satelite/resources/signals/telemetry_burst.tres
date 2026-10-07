@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="SignalDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="SignalDefinition" format=3 uid="uid://bwxjbruwg8l5t"]
 
-[ext_resource type="Script" path="res://scripts/systems/satellite/signal_definition.gd" id="1_sigdef"]
+[ext_resource type="Script" uid="uid://51gghjg5q413" path="res://scripts/systems/satellite/signal_definition.gd" id="1_sigdef"]
 
 [resource]
 script = ExtResource("1_sigdef")
@@ -9,8 +9,9 @@ display_name = "Telemetry burst"
 signal_type = &"burst"
 channel = &"radio"
 description = "A short packet of housekeeping data, then nothing."
+points = 15
 details = {
+&"Bitrate": "9600 bps",
 &"Duration": "1.2 s",
-&"Frequency": "437.125 MHz",
-&"Bitrate": "9600 bps"
+&"Frequency": "437.125 MHz"
 }

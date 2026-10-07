@@ -24,6 +24,7 @@ enum Id {
 	STATS,
 	PARTS,
 	DOWNLINK,
+	CONFIG,
 }
 
 const MENU_PATHS := {
@@ -34,6 +35,7 @@ const MENU_PATHS := {
 	Id.STATS: "res://scenes/ui/stats_menu.tscn",
 	Id.PARTS: "res://scenes/ui/parts_menu.tscn",
 	Id.DOWNLINK: "res://scenes/ui/downlink_menu.tscn",
+	Id.CONFIG: "res://scenes/ui/config_menu.tscn",
 }
 
 const HUD_PATH := "res://scenes/ui/hud_bar.tscn"

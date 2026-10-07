@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="UpgradeDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/satellite/upgrade_definition.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"solar_panels"
+display_name = "Solar Panels"
+description = "Another panel on the array. Each level pushes the satellite's power up, and the control panel counts how many have been fitted."
+stat_effects = {
+&"power": 2.0
+}
+max_level = 11
+base_cost = 20
+cost_growth = 1.25

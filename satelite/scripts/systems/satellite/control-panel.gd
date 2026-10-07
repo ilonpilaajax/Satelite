@@ -32,8 +32,12 @@ extends Node
 ## the satellite tracks, so the distance appears and updates on its own.
 
 ## Emitted whenever a signal is heard, so the menu listing findings does not have to
-## poll. [param count] is how many times in total.
+## poll. [param count] is the hearing's own count, which is one: findings
+## do not stack, so every hearing files a row of its own.
 signal signal_found(channel: StringName, found: Resource, count: int)
+## One finding was accepted in the signals menu. Whoever listens hands
+## the signal to the downlink, which is where a signal is sent from.
+signal signal_accepted(channel: StringName, found: Resource)
 ## Emitted when findings are cleared.
 signal signals_changed()
 ## Emitted when the antenna counts change, carrying {channel: count}. A part fitted to a
@@ -55,6 +59,9 @@ signal antenna_counts_changed(counts: Dictionary)
 ## particles 3. Kept next to those calls so the numbers stay traceable.
 const CHANNEL_BY_ID: Array[StringName] = [&"radio", &"radiation", &"light", &"particles"]
 
+## Strength added to every channel per level of the antenna strength upgrade.
+const STRENGTH_PER_LEVEL := 5
+
 ## Signals this panel is able to detect. Anything here whose [member
 ## SignalDefinition.channel] matches a channel can turn up on it. An empty catalogue is
 ## valid: nothing is ever found, and the signals menu shows its empty message.
@@ -62,37 +69,42 @@ const CHANNEL_BY_ID: Array[StringName] = [&"radio", &"radiation", &"light", &"pa
 
 # Satelite
 
-# Solar Panels
-var solar_panel_level:int
-
+# Upgrades. How many times each has been bought, pushed in from the upgrades block by
+# [method set_upgrade_levels]. These are counts, not numbers the panel computes: the upgrades
+# module owns what a level means and this only remembers it, so the same level count drives
+# the listening numbers below and whatever else reads it.
+var solar_panel_level: int = 0
+var antenna_strength_level: int = 0
+var antenna_focus_level: int = 0
+var antenna_uptime_level: int = 0
 
 # Radio
 var detecting_radio_signals:bool = true
 var anten_ammount_radio:int = 0
-var anten_strenght_radio:int = 3
+var anten_strenght_radio:int = 20
 var timer_radio:float
-var search_range_radio:float = 3
+var search_range_radio:float = 4.0
 
 # Radiation
 var detecting_radiation_level:bool = true
 var anten_ammount_radiation:int = 0
-var anten_strenght_radiation:int
+var anten_strenght_radiation:int = 15
 var timer_radiation:float
-var search_range_radiation:float
+var search_range_radiation:float = 80.0
 
 # Light
 var detecting_light:bool = true
 var anten_ammount_light:int = 0
-var anten_strenght_light:int
+var anten_strenght_light:int = 25
 var timer_light:float
-var search_range_light:float
+var search_range_light:float = 120.0
 
 # Particles
 var detecting_particles:bool = true
 var anten_ammount_particles:int = 0
-var anten_strenght_particles:int
+var anten_strenght_particles:int = 10
 var timer_particles:float
-var search_range_particles:float
+var search_range_particles:float = 60.0
 
 # --- Antennas ---------------------------------------------------------------
 
@@ -101,9 +113,18 @@ var search_range_particles:float
 ## only place that knows what is on the satellite.
 var _antenna_counts: Dictionary = {}
 
-## Findings, keyed by channel then by signal id, so a signal heard again is counted
-## rather than listed twice. Each entry is {definition, count, strength}.
+## Upgrade levels as {upgrade_id: level}, the same block the upgrades block was given.
+var _upgrade_levels: Dictionary = {}
+
+## What has been heard, keyed by channel: an Array with one entry per
+## hearing. Findings do not stack - the same signal heard twice is two
+## entries, because each hearing is accepted and sent on its own. Each
+## entry is {definition, strength, key, accepted}, where key names that
+## one hearing so a row can be pointed at even when two hearings are
+## the same signal.
 var _found: Dictionary = {}
+## Counter for finding keys, so every hearing has a name of its own.
+var _next_finding: int = 1
 
 
 ## Takes the antenna counts off the satellite's mounts. [param counts] is {channel: count},
@@ -143,6 +164,109 @@ func antenna_counts() -> Dictionary:
 	return _antenna_counts.duplicate()
 
 
+## The base strength every channel listens at. One number rather than one per
+## channel, which is what a single strength setting for the satellite reads
+## as. The channels started life with different strengths, so this is the
+## radio one until something gives them all the same.
+func antenna_strength() -> int:
+	return anten_strenght_radio
+
+
+## The base strength [param channel] listens at, before the strength
+## upgrade. What the config menu shows for that one antenna.
+func antenna_strength_of(channel: StringName) -> int:
+	match channel:
+		&"radio": return anten_strenght_radio
+		&"radiation": return anten_strenght_radiation
+		&"light": return anten_strenght_light
+		&"particles": return anten_strenght_particles
+	return 0
+
+
+## How wide [param channel]'s listen is, before the focus upgrade. What
+## the config menu shows for that one antenna.
+func antenna_range_of(channel: StringName) -> float:
+	match channel:
+		&"radio": return search_range_radio
+		&"radiation": return search_range_radiation
+		&"light": return search_range_light
+		&"particles": return search_range_particles
+	return 0.0
+
+
+## The configuration of the antennas on [param channel]: what type they are,
+## how many are fitted, the base strength they listen at and how wide a listen
+## is. One dictionary per antenna, which is what the config menu shows.
+func antenna_config(channel: StringName) -> Dictionary:
+	return {
+		"type": str(channel),
+		"count": antenna_count_of(channel),
+		"strength": antenna_strength_of(channel),
+		"range": antenna_range_of(channel),
+	}
+
+
+## Every channel's antenna configuration, as {channel: config}. Built from
+## [constant CHANNEL_BY_ID] rather than the [member channels] export, because
+## these are the channels the panel can actually hear on.
+func antenna_configs() -> Dictionary:
+	var result: Dictionary = {}
+	for channel: StringName in CHANNEL_BY_ID:
+		result[channel] = antenna_config(channel)
+	return result
+
+
+## Records how many levels each upgrade has been bought, as {upgrade_id: level}. The same
+## shape the upgrades block reports, so the panel is handed its own data rather than reaching
+## into the upgrades module.
+##
+## The four fields above are written from this, so the panel and its per-upgrade counts cannot
+## disagree. An id with no field of its own is still kept, so an upgrade this panel does not
+## know about yet is not lost.
+func set_upgrade_levels(levels: Dictionary) -> void:
+	_upgrade_levels = levels.duplicate()
+	solar_panel_level = maxi(int(_upgrade_levels.get(&"solar_panels", 0)), 0)
+	antenna_strength_level = maxi(int(_upgrade_levels.get(&"antenna_strength", 0)), 0)
+	antenna_focus_level = maxi(int(_upgrade_levels.get(&"antenna_focus", 0)), 0)
+	antenna_uptime_level = maxi(int(_upgrade_levels.get(&"antenna_uptime", 0)), 0)
+
+
+## How many levels of [param upgrade_id] have been bought, or 0.
+func upgrade_level_of(upgrade_id: StringName) -> int:
+	return maxi(int(_upgrade_levels.get(upgrade_id, 0)), 0)
+
+
+## Every upgrade level the panel knows about, as {upgrade_id: level}.
+func upgrade_levels() -> Dictionary:
+	return _upgrade_levels.duplicate()
+
+
+## How much stronger each channel hears, as its base strength plus the antenna strength
+## upgrade. One place, so every channel is upgraded the same way and a level bought once
+## counts for all of them.
+func _strength_of(channel: StringName) -> int:
+	var base := 0
+	match channel:
+		&"radio": base = anten_strenght_radio
+		&"radiation": base = anten_strenght_radiation
+		&"light": base = anten_strenght_light
+		&"particles": base = anten_strenght_particles
+	return base + antenna_strength_level * STRENGTH_PER_LEVEL
+
+
+## How wide a channel's listen is: its base range divided by the antenna focus upgrade, so
+## each focus level narrows the window and makes a find likelier. Never below 1, because a
+## window of zero would make the roll a certainty rather than a search.
+func _window_of(channel: StringName) -> int:
+	var base := 0.0
+	match channel:
+		&"radio": base = search_range_radio
+		&"radiation": base = search_range_radiation
+		&"light": base = search_range_light
+		&"particles": base = search_range_particles
+	return maxi(int(round(base / float(1 + antenna_focus_level))), 1)
+
+
 ## Writes one count to whichever field the panel keeps for that channel. Matched by channel
 ## rather than written by id, so adding a channel is a field and an entry in
 ## [constant CHANNEL_BY_ID] and nothing else.
@@ -162,13 +286,15 @@ func _ready():
 ##
 ## [param part] is the antenna that was bought. Anything without an
 ## [member PartDefinition.antenna_channel] - solar panels, say - is not an antenna, so
-## buying it does nothing here. Called without an argument it is a no-op rather than an
-## error, which keeps a bare call from anywhere harmless.
+## buying it does nothing here. Called without an argument it is a no-op rather than
+## an error, which keeps a bare call from anywhere harmless.
 func detect_new_anten(part: Resource = null) -> void:
 	var channel := _channel_of(part)
 	if channel.is_empty() or not _is_listening(channel):
 		return
-	_record(channel)
+	# The antenna that was just bought hears on this sweep even before it is
+	# fitted anywhere, which is why it counts itself in.
+	_listen(channel, 1)
 
 
 ## Which channel [param part] listens on, or empty when it is null or carries no channel.
@@ -202,37 +328,58 @@ func run_radio(delta):
 	timer_radio -= delta
 	if timer_radio <= 0:
 		timer_radio = randi_range(2,8)
-		# randi_range takes whole numbers, so the float range is cast here. Without it
-		# this raised every call and the channel never detected anything.
-		var random_value = randi_range(0, int(search_range_radio))
-		if random_value <= anten_strenght_radio:detect_new_signal(0)
+		_listen(&"radio")
 
 func run_radiation(delta):
 	timer_radiation -= delta
 	if timer_radiation <= 0:
 		timer_radiation = randi_range(2,8)
-		var random_value = randi_range(0, int(anten_strenght_radiation))
-		if random_value <= anten_strenght_radiation:detect_new_signal(1)
+		_listen(&"radiation")
 
 func run_light(delta):
 	timer_light -= delta
 	if timer_light <= 0:
 		timer_light = randi_range(2,8)
-		var random_value = randi_range(0, int(search_range_light))
-		if random_value <= anten_strenght_light:detect_new_signal(2)
+		_listen(&"light")
 
 func run_particles(delta):
 	timer_particles -= delta
 	if timer_particles <= 0:
 		timer_particles = randi_range(2,8)
-		var random_value = randi_range(0, int(search_range_particles))
-		if random_value <= anten_strenght_particles:detect_new_signal(3)
+		_listen(&"particles")
+
+
+## One listen on [param channel]: roll once across the channel's window and file a
+## finding when the roll comes in at or below its strength, so the chance of hearing
+## something is strength over window. Both come from the base fields plus the antenna
+## upgrades, which is what makes buying those upgrades change what the satellite hears.
+##
+## Every antenna fitted on the channel is another chance to find something, so its
+## count multiplies the strength. A channel with no antenna - and none that just
+## bought its way in - hears nothing at all and files nothing.
+##
+## [param extra] counts antennas that are not fitted yet but should still hear this
+## once, which is the antenna that was just bought.
+##
+## One function for every channel rather than a copy per channel, so the four channels cannot
+## drift apart - which they had: radiation rolled against its strength and light and particles
+## had neither a strength nor a window at all.
+func _listen(channel: StringName, extra: int = 0) -> void:
+	var index := CHANNEL_BY_ID.find(channel)
+	if index < 0:
+		return
+	var antennas := antenna_count_of(channel) + extra
+	if antennas <= 0:
+		return
+	# randi_range takes whole numbers, so the window is cast here. Without it this raised
+	# every call and the channel never detected anything.
+	if randi_range(0, _window_of(channel)) <= _strength_of(channel) * antennas:
+		detect_new_signal(index)
 
 
 ## Records a detection on the channel [param id] refers to. The id cases are the ones
 ## this always had; what each does now is file a finding rather than nothing.
 func detect_new_signal(id:int):
-	print("detected", id)
 	match id:
 		0:
 			_record(&"radio")
@@ -246,44 +393,58 @@ func detect_new_signal(id:int):
 			pass
 
 
-## Files one of the catalogue's signals for [param channel] as heard, at a random
-## strength. Repeat detections of the same signal raise its count instead of adding a
-## second row, so a channel that keeps hearing one carrier still lists it once.
+## Files one hearing of a signal drawn from [param channel]'s own
+## catalogue, at a random strength. The roll is per hearing, so the
+## same signal can come up again on the next one - it arrives as a
+## finding of its own rather than as a bigger number on the one
+## already filed.
 func _record(channel: StringName) -> void:
 	var options := signals_for(channel)
 	if options.is_empty():
 		return
 	var definition: SignalDefinition = options[randi() % options.size()]
-	var by_channel: Dictionary = _found.get(channel, {})
-	var entry: Dictionary = by_channel.get(definition.id, {})
-	var count := int(entry.get("count", 0)) + 1
-	by_channel[definition.id] = {
+	var findings: Array = _found.get(channel, [])
+	if findings == null:
+		findings = []
+	findings.append({
 		"definition": definition,
-		"count": count,
 		"strength": randf(),
-	}
-	_found[channel] = by_channel
-	signal_found.emit(channel, definition, count)
+		"key": _finding_key(),
+		"accepted": false,
+	})
+	_found[channel] = findings
+	signal_found.emit(channel, definition, 1)
 
 
-## What has been heard on [param channel], one row per signal, already carrying
-## everything a list needs to render: id, name, type, icon, description, the signal's
-## own details, the measured strength and how many times it has been heard.
+## A name no hearing has had yet, so a row can be pointed at -
+## accepted, sent - without comparing signal types, which two
+## hearings may well share.
+func _finding_key() -> StringName:
+	var key := StringName("finding-%d" % _next_finding)
+	_next_finding += 1
+	return key
+
+
+## What has been heard on [param channel], one row per hearing, already
+## carrying everything a list needs to render: id, name, type, icon,
+## description, the signal's own details, the measured strength, and the
+## hearing's key and accepted state. One hearing is one row, even when
+## it is the same signal as the row above it, because each is accepted
+## on its own.
 func findings_for(channel: StringName) -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
-	var by_channel: Dictionary = _found.get(channel, {})
-	for key: Variant in by_channel:
-		var found: Dictionary = by_channel[key]
-		var definition: SignalDefinition = found.get("definition")
+	var findings: Array = _found.get(channel, [])
+	if findings == null:
+		return rows
+	for entry: Variant in findings:
+		var finding: Dictionary = entry
+		var definition: SignalDefinition = finding.get("definition")
 		if definition == null:
 			continue
 		var details: Dictionary = (definition.details as Dictionary).duplicate()
-		# The measured strength and the count go in last, so a measurement always wins
+		# The measured strength goes in last, so a measurement always wins
 		# over a description that happened to use the same key.
-		details["Strength"] = "%d%%" % roundi(float(found.get("strength", 0.0)) * 100.0)
-		var count := int(found.get("count", 0))
-		if count > 1:
-			details["Heard"] = "%d times" % count
+		details["Strength"] = "%d%%" % roundi(float(finding.get("strength", 0.0)) * 100.0)
 		rows.append({
 			"id": definition.id,
 			"display_name": definition.display_name,
@@ -291,9 +452,32 @@ func findings_for(channel: StringName) -> Array[Dictionary]:
 			"icon": definition.icon,
 			"description": definition.description,
 			"details": details,
-			"count": count,
+			"key": StringName(finding.get("key", &"")),
+			"accepted": bool(finding.get("accepted", false)),
 		})
 	return rows
+
+
+## Marks the hearing [param key] filed on [param channel] as accepted,
+## which announces it through [code]signal_accepted[/code] so it can go
+## to the downlink. False when there is no such hearing, or it has been
+## accepted already: one hearing is accepted once.
+func accept_finding(channel: StringName, key: StringName) -> bool:
+	var findings: Array = _found.get(channel, [])
+	if findings == null:
+		return false
+	for entry: Variant in findings:
+		var finding: Dictionary = entry
+		if StringName(finding.get("key", &"")) != key:
+			continue
+		if bool(finding.get("accepted", false)):
+			return false
+		finding["accepted"] = true
+		var definition: SignalDefinition = finding.get("definition")
+		signal_accepted.emit(channel, definition)
+		signals_changed.emit()
+		return true
+	return false
 
 
 ## Catalogue entries available on [param channel]. Empty for an unknown channel, and for
@@ -304,6 +488,16 @@ func signals_for(channel: StringName) -> Array[SignalDefinition]:
 		if entry != null and entry.channel == channel:
 			result.append(entry)
 	return result
+
+
+## The catalogue entry with this id, or null. A save names the signals
+## the downlink is holding by id, and this is how a loaded queue
+## becomes the definitions again.
+func signal_of(signal_id: StringName) -> SignalDefinition:
+	for entry in signals:
+		if entry != null and entry.id == signal_id:
+			return entry
+	return null
 
 
 ## Every channel as {id, label, caption, found, total}, which is what the signals menu
@@ -323,10 +517,12 @@ func channel_tabs() -> Array[Dictionary]:
 
 
 ## Forgets everything heard on [param channel], or on every channel when left empty.
-## Findings are not part of the save, so this is also how a new game starts clean.
+## Findings are not part of the save, so this is also how a new game starts clean:
+## nothing carried over, because a new game hears everything for the first time.
 func clear_findings(channel: StringName = &"") -> void:
 	if channel.is_empty():
 		_found.clear()
+		_next_finding = 1
 	else:
-		_found.erase(channel)
+		_found[channel] = []
 	signals_changed.emit()

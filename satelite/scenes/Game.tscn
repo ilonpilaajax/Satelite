@@ -11,3 +11,4 @@
 [node name="Main" parent="." unique_id=1701845390 instance=ExtResource("2_78awf")]
 
 [node name="Satellite" parent="." unique_id=1550797153 instance=ExtResource("3_s0nni")]
+satellite_type = "RELAY"

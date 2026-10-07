@@ -4,8 +4,10 @@ extends Resource
 ##
 ## A catalogue entry, not a finding. Dropping a [SignalDefinition] into the control
 ## panel's [code]signals[/code] makes it something the satellite is able to detect; a
-## finding - one actually picked up - is a definition plus how strong it came in and how
-## many times, which the control panel records and the signals menu lists.
+## finding - one actually picked up - is a definition plus how strong it came in and
+## whether it has been accepted, which the control panel records and the signals
+## menu lists. Every hearing is a finding of its own: the same signal heard twice
+## is two findings, not one with a bigger count.
 ##
 ## Keep them as [code].tres[/code] files so several satellites can share a catalogue,
 ## exactly as with [PartDefinition].
@@ -29,6 +31,13 @@ extends Resource
 @export var icon: Texture2D = null
 
 @export_multiline var description: String = ""
+
+## Credits paid out when this signal has been sent down the
+## downlink. Zero is a valid value: a signal worth nothing is
+## still a signal, and the player can still accept and send it.
+## Set on the resource, not here, because what a signal is
+## worth is a property of the signal, not of the definition.
+@export var points: int = 0
 
 ## The signal's own readings, rendered as the line under its name, e.g.
 ## {&"Frequency": "868.5 MHz", &"Bandwidth": "125 kHz"}.

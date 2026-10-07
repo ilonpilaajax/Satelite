@@ -11,11 +11,10 @@
 [ext_resource type="Resource" path="res://resources/upgrades/reaction_wheel.tres" id="8_wheel"]
 [ext_resource type="Script" uid="uid://br7xth1cn4dpb" path="res://scripts/systems/satellite/motion_component.gd" id="9_motion"]
 [ext_resource type="Script" uid="uid://dydxr0hgrdops" path="res://scripts/systems/satellite/parts_component.gd" id="11_parts"]
-[ext_resource type="Script" path="res://scripts/systems/satellite/slots_component.gd" id="31_slots"]
 [ext_resource type="Script" uid="uid://cy3py5q316yym" path="res://scripts/systems/satellite/part_definition.gd" id="12_partdef"]
-[ext_resource type="Resource" path="res://resources/parts/radio_antenna.tres" id="13_radio"]
-[ext_resource type="Resource" path="res://resources/parts/particle_antenna.tres" id="14_particle"]
-[ext_resource type="Resource" path="res://resources/parts/solar_panels.tres" id="15_panels"]
+[ext_resource type="Resource" uid="uid://bbpslhheolgfd" path="res://resources/parts/radio_antenna.tres" id="13_radio"]
+[ext_resource type="Resource" uid="uid://cdt0fgpi2klmg" path="res://resources/parts/particle_antenna.tres" id="14_particle"]
+[ext_resource type="Resource" uid="uid://cbg65q03fep4a" path="res://resources/parts/solar_panels.tres" id="15_panels"]
 [ext_resource type="Script" uid="uid://ca5sxcf5kqe8u" path="res://scripts/systems/satellite/downlink_component.gd" id="19_downlink"]
 [ext_resource type="Script" uid="uid://51gghjg5q413" path="res://scripts/systems/satellite/signal_definition.gd" id="21_sigdef"]
 [ext_resource type="Resource" path="res://resources/signals/hab_carrier.tres" id="22_hab"]
@@ -27,6 +26,11 @@
 [ext_resource type="Resource" path="res://resources/signals/debris_swarm.tres" id="28_swarm"]
 [ext_resource type="Resource" path="res://resources/signals/solar_flux_alert.tres" id="29_flux"]
 [ext_resource type="Resource" path="res://resources/signals/gamma_pulse.tres" id="30_gamma"]
+[ext_resource type="Script" uid="uid://b3pbgw71nk3ei" path="res://scripts/systems/satellite/slots_component.gd" id="31_slots"]
+[ext_resource type="Resource" path="res://resources/upgrades/solar_panels.tres" id="32_panels"]
+[ext_resource type="Resource" path="res://resources/upgrades/antenna_strength.tres" id="33_strength"]
+[ext_resource type="Resource" path="res://resources/upgrades/antenna_focus.tres" id="34_focus"]
+[ext_resource type="Resource" path="res://resources/upgrades/antenna_uptime.tres" id="35_uptime"]
 
 [sub_resource type="CanvasTexture" id="CanvasTexture_i5eai"]
 
@@ -109,6 +113,7 @@ texture = SubResource("CanvasTexture_i5eai")
 position = Vector2(2, -2)
 
 [node name="Anten-Slot-1" type="Sprite2D" parent="Body/Upper-Module/Satelites" unique_id=305175503]
+visible = false
 modulate = Color(0.5211406, 0.52114064, 0.5211403, 1)
 position = Vector2(-35.61026, -155.99998)
 scale = Vector2(82.77942, 78)
@@ -291,6 +296,9 @@ stat_meta = {
 &"speed": {
 "caption": "SPEED",
 "decimals": 1,
+"secondary_decimals": 0,
+"secondary_scale": 3600.0,
+"secondary_unit": "km/h",
 "tab": "FLIGHT",
 "unit": "km/s"
 }
@@ -298,16 +306,16 @@ stat_meta = {
 
 [node name="Upgrades" type="Node" parent="." unique_id=797767683]
 script = ExtResource("3_upgrades")
-upgrades = Array[ExtResource("4_1ercd")]([ExtResource("6_thruster"), ExtResource("8_wheel")])
+upgrades = Array[ExtResource("4_1ercd")]([ExtResource("6_thruster"), ExtResource("8_wheel"), ExtResource("32_panels"), ExtResource("33_strength"), ExtResource("34_focus"), ExtResource("35_uptime")])
+currency_stat = &"credits"
 
 [node name="Parts" type="Node" parent="." unique_id=1539920464]
 script = ExtResource("11_parts")
 parts = Array[ExtResource("12_partdef")]([ExtResource("13_radio"), ExtResource("14_particle"), ExtResource("15_panels")])
 currency_stat = &"credits"
 
-[node name="Slots" type="Node" parent="."]
+[node name="Slots" type="Node" parent="." unique_id=259323252]
 script = ExtResource("31_slots")
-slot_count = 5
 
 [node name="Appearance" type="Node" parent="." unique_id=176231078]
 script = ExtResource("4_appearance")

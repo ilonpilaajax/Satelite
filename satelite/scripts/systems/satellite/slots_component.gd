@@ -38,6 +38,11 @@ signal slots_changed(slot: int)
 signal part_fitted(part: Resource, slot: int, replaced: Resource)
 ## [param slot] has been emptied.
 signal slot_cleared(slot: int)
+## An antenna has been put into [param slot] and is being set up. Carries the mount and the
+## seconds the wait lasts, so a readout can show the countdown from the moment it starts.
+signal install_started(slot: int, seconds: float)
+## The antenna in [param slot] has finished setting up and is now working.
+signal install_finished(slot: int, part: Resource)
 
 ## Node the mount sprites are found under, relative to this module.
 @export var mount_root: NodePath = ^"../Body/Upper-Module/Satelites"
@@ -54,6 +59,12 @@ signal slot_cleared(slot: int)
 ## the satellite so a mount reads the same size whatever the hull is doing.
 @export var marker_size: float = 9.0
 
+## Seconds an antenna takes to be set up once it is in a mount. The wait is why a freshly
+## fitted antenna counts for nothing: it is on the hull but not yet listening, and its stat
+## effects are only written when it comes up. Zero sets an antenna up the moment it is
+## fitted, which is what a satellite that should react instantly would use.
+@export var install_seconds: float = 5.0
+
 ## What is fitted to [code]mount_root[/code]: a [PartDefinition] or null, per mount. Read
 ## [method slots] rather than this - it is the same thing with the reporting the UI wants.
 var _fitted: Array = []
@@ -61,6 +72,17 @@ var _fitted: Array = []
 var _mounts: Array[Node2D] = []
 ## The marker drawn per slot, so re-fitting one does not rebuild the others.
 var _markers: Dictionary = {}
+## The setup countdown shown over each mount, so a fitted antenna says on the satellite itself
+## how long it has left before it starts working.
+var _countdowns: Dictionary = {}
+## Seconds of setup left on each mount, or 0 where the fitted part is already working. One
+## entry per mount, kept the same length as [member _fitted] by [method _discover_mounts].
+var _installing: Array[float] = []
+## The antenna stats per mount, in slot order: a {strength, range}
+## dictionary where an antenna is fitted, empty where there is none.
+## Each antenna carries its own, seeded from its channel's defaults
+## when it is mounted, so no two antennas have to share.
+var _antenna_stats: Array[Dictionary] = []
 
 var _parts: SatelliteParts = null
 
@@ -70,6 +92,21 @@ func _ready() -> void:
 	_render_all()
 
 
+## Ticks the setup timers. Only the mounts that are actually waiting cost anything, and a
+## satellite with nothing being set up does no work per frame beyond this check.
+func _process(delta: float) -> void:
+	if _installing.is_empty():
+		return
+	for slot: int in _installing.size():
+		if _installing[slot] <= 0.0:
+			continue
+		_installing[slot] = maxf(_installing[slot] - delta, 0.0)
+		if _installing[slot] > 0.0:
+			_paint_countdown(slot)
+			continue
+		_finish_install(slot)
+
+
 # --- Mounts -----------------------------------------------------------------
 
 ## Finds the mount nodes and pairs them with empty mounts. Called once on ready, and again
@@ -77,6 +114,7 @@ func _ready() -> void:
 func _discover_mounts() -> void:
 	_fitted.clear()
 	_mounts.clear()
+	_installing.clear()
 	var root: Node = get_node_or_null(mount_root)
 	if root == null:
 		return
@@ -95,11 +133,17 @@ func _discover_mounts() -> void:
 		if stale is Node:
 			(stale as Node).queue_free()
 	_markers.clear()
+	for stale: Variant in _countdowns.values():
+		if stale is Node:
+			(stale as Node).queue_free()
+	_countdowns.clear()
 
 	for index: int in mini(slot_count, found.size()):
 		var mount := found[index]
 		_mounts.append(mount)
 		_fitted.append(null)
+		_installing.append(0.0)
+		_antenna_stats.append({})
 
 		var marker := Polygon2D.new()
 		# Above the hull sprite, which sits at 1, so a part mounted on the near side is not
@@ -115,6 +159,20 @@ func _discover_mounts() -> void:
 		# idle pulse the marker rides along with.
 		root.add_child(marker)
 		_markers[index] = marker
+
+		# The countdown for the same mount, on the same unscaled parent, so the number on
+		# the hull is as many pixels as it is tall rather than scaled up by a mount sprite.
+		# Above the marker, and it never takes input: the hull is decoration, not a control.
+		var countdown := Label.new()
+		countdown.z_index = 3
+		countdown.visible = false
+		countdown.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		countdown.size = Vector2(48, 16)
+		countdown.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		countdown.add_theme_font_size_override(&"font_size", 11)
+		countdown.add_theme_color_override(&"font_color", Color(0.98, 0.82, 0.44))
+		root.add_child(countdown)
+		_countdowns[index] = countdown
 	_render_all()
 
 
@@ -167,11 +225,15 @@ func fit(part_id: StringName, slot: int) -> bool:
 		vacated = slot_of(part_id)
 		if vacated < 0:
 			return false
-		_fitted[vacated] = null
-		_render(vacated)
-		slots_changed.emit(vacated)
+		_evict(vacated)
+	# Replacing what is already in this mount. Evicted rather than overwritten, because the
+	# part being replaced may be working, and the satellite has to stop paying for hardware
+	# that is no longer on the hull.
+	if held != null:
+		_evict(slot)
 
 	_fitted[slot] = part
+	_start_install(slot, part)
 	_render(slot)
 	part_fitted.emit(part, slot, held)
 	slots_changed.emit(slot)
@@ -187,11 +249,109 @@ func clear(slot: int) -> PartDefinition:
 	var removed := _fitted[slot] as PartDefinition
 	if removed == null:
 		return null
-	_fitted[slot] = null
-	_render(slot)
+	_evict(slot)
 	slot_cleared.emit(slot)
 	slots_changed.emit(slot)
 	return removed
+
+
+## Takes whatever was in [param slot] out of it: the part is un-fitted, and if it was
+## working its stat effects are taken back off, because the satellite stops having that
+## hardware the moment it leaves the mount.
+func _evict(slot: int) -> void:
+	var removed := _fitted[slot] as PartDefinition
+	_fitted[slot] = null
+	_installing[slot] = 0.0
+	if slot >= 0 and slot < _antenna_stats.size():
+		_antenna_stats[slot] = {}
+	if removed != null and _parts != null:
+		_parts.deactivate(removed)
+	_render(slot)
+
+
+## Starts [param part]'s setup in [param slot]. An antenna takes [member install_seconds] to
+## come up; anything else is working the moment it is fitted, which is what keeps a
+## non-instrument part - a solar panel - from costing a few seconds of dead
+## time.
+##
+## Nothing is written to the stats here. The effects land when the wait ends, so a part that
+## was just fitted contributes nothing until it is set up.
+func _start_install(slot: int, part: PartDefinition) -> void:
+	if part.antenna_channel.is_empty() or install_seconds <= 0.0:
+		_installing[slot] = 0.0
+		if _parts != null:
+			_parts.activate(part)
+		return
+	_installing[slot] = install_seconds
+	install_started.emit(slot, install_seconds)
+
+
+## The wait ran out on [param slot]: the antenna is working, so its effects are written and
+## the mount is reported as changed, which is what carries the new antenna count to the
+## control panel.
+func _finish_install(slot: int) -> void:
+	var part := fitted_at(slot)
+	if part == null:
+		return
+	if _parts != null:
+		_parts.activate(part)
+	_paint_countdown(slot)
+	install_finished.emit(slot, part)
+	slots_changed.emit(slot)
+
+
+## Seconds of setup left on [param slot], or 0 when nothing is being set up there - which
+## covers an empty mount and a part that is already working.
+func install_remaining(slot: int) -> float:
+	if slot < 0 or slot >= _installing.size():
+		return 0.0
+	return maxf(_installing[slot], 0.0)
+
+
+## Whether [param slot] holds a part that is up and running. False for an empty mount and
+## for an antenna still being set up, which is the difference between owning the hardware
+## and having it working.
+func is_installed(slot: int) -> bool:
+	return fitted_at(slot) != null and install_remaining(slot) <= 0.0
+
+
+## The mount within [param radius] of [param position], a world
+## position, or -1 when none is. What a pointer hovering the hull
+## is checked against, because a mount is where an antenna lives.
+func mount_at(position: Vector2, radius: float) -> int:
+	for slot: int in _mounts.size():
+		var mount: Node2D = _mounts[slot]
+		if mount == null:
+			continue
+		if mount.global_position.distance_to(position) <= radius:
+			return slot
+	return -1
+
+
+## What the antenna in [param slot] is and how it is set: its
+## channel, the strength it listens at and how wide a listen
+## is, or empty when the mount holds no antenna. One antenna's
+## own stats, not its channel's.
+func antenna_at(slot: int) -> Dictionary:
+	var part := fitted_at(slot)
+	if part == null or part.antenna_channel.is_empty():
+		return {}
+	var stats: Dictionary = _antenna_stats[slot] if slot >= 0 and slot < _antenna_stats.size() else {}
+	return {
+		"type": str(part.antenna_channel),
+		"strength": int(stats.get(&"strength", 0)),
+		"range": float(stats.get(&"range", 0.0)),
+	}
+
+
+## Gives the antenna in [param slot] its own stats. Called with
+## the channel's defaults when an antenna is mounted, so each
+## antenna starts from its kind's settings and carries its own
+## from there.
+func seed_antenna_stats(slot: int, stats: Dictionary) -> void:
+	if slot < 0 or slot >= _antenna_stats.size():
+		return
+	_antenna_stats[slot] = stats.duplicate()
 
 
 ## What is fitted to [param slot], or null.
@@ -229,10 +389,20 @@ func slots_of(part_id: StringName) -> Array:
 
 
 ## How many mounts hold [param part_id]: how many of the copies bought are actually on the
-## satellite. Never more than [method owned_count_of], so this is the count a part's own
-## stat effects are already paying for.
+## satellite. Never more than [method owned_count_of].
 func fitted_count_of(part_id: StringName) -> int:
 	return slots_of(part_id).size()
+
+
+## How many copies of [param part_id] are fitted *and* set up, which is the count that pays
+## for its stat effects and feeds the control panel's antenna counts. A copy still being
+## installed is on the satellite but not yet in this number.
+func working_count_of(part_id: StringName) -> int:
+	var result := 0
+	for slot: int in slots_of(part_id):
+		if is_installed(slot):
+			result += 1
+	return result
 
 
 ## Whether one more copy of [param part_id] could be fitted without moving one that already
@@ -249,6 +419,11 @@ func owned_count_of(part_id: StringName) -> int:
 
 ## Swaps the contents of two mounts. Refused when either index is not a mount this
 ## satellite has, which leaves both as they were.
+##
+## Each part travels with whatever setup time it had left, so a part that was already
+## working does not start over because it moved, and one that was still being installed keeps
+## its countdown. Nothing is taken off or written to the stats: the same two parts are fitted
+## after the swap as before it, only in different mounts.
 func swap(first: int, second: int) -> bool:
 	if first < 0 or second < 0 or first >= _mounts.size() or second >= _mounts.size():
 		return false
@@ -257,6 +432,17 @@ func swap(first: int, second: int) -> bool:
 	var held: Variant = _fitted[first]
 	_fitted[first] = _fitted[second]
 	_fitted[second] = held
+	# Through a temporary: reading the first entry again after writing it would swap the
+	# same value into both mounts and lose both countdowns.
+	var waiting := _installing[first]
+	_installing[first] = _installing[second]
+	_installing[second] = waiting
+	# The stats travel with the antenna, because they are the antenna's
+	# own, so a moved antenna keeps what it was set to.
+	if first >= 0 and first < _antenna_stats.size() and second >= 0 and second < _antenna_stats.size():
+		var carried := _antenna_stats[first]
+		_antenna_stats[first] = _antenna_stats[second]
+		_antenna_stats[second] = carried
 	_render(first)
 	_render(second)
 	slots_changed.emit(first)
@@ -265,9 +451,9 @@ func swap(first: int, second: int) -> bool:
 
 
 ## One entry per mount, in order, as the UI wants it: whether something is in it, what, the
-## position on screen the mount sits at, so a picker can say where each one is, and which
+## position on screen the mount sits at, so a picker can say where each one is, which
 ## channel that part serves, so a satellite can add up its antenna counts without asking the
-## parts catalogue for each entry again.
+## parts catalogue for each entry again, and how much setup is left on it.
 func slots() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for slot: int in _mounts.size():
@@ -279,6 +465,9 @@ func slots() -> Array[Dictionary]:
 			"display_name": part.display_name if part != null else "",
 			"antenna_channel": part.antenna_channel if part != null else &"",
 			"position": _mounts[slot].position,
+			"installing": install_remaining(slot) > 0.0,
+			"install_remaining": install_remaining(slot),
+			"installed": is_installed(slot),
 		})
 	return result
 
@@ -287,11 +476,13 @@ func slots() -> Array[Dictionary]:
 ## satellite can hear: one per mount, because each mount is one piece of hardware.
 ##
 ## Read off the mounts rather than off what was bought, so a part that has been replaced is
-## not counted and a copy that is bought but not mounted is not counted either.
+## not counted and a copy that is bought but not mounted is not counted either. An antenna
+## still being set up is not counted until it is: the satellite cannot hear with hardware it
+## has not finished installing.
 func antenna_counts() -> Dictionary:
 	var result: Dictionary = {}
 	for entry: Dictionary in slots():
-		if not bool(entry.get("occupied", false)):
+		if not bool(entry.get("occupied", false)) or not bool(entry.get("installed", false)):
 			continue
 		var channel := StringName(entry.get("antenna_channel", &""))
 		if channel.is_empty():
@@ -336,8 +527,15 @@ func _render(slot: int) -> void:
 	# afterwards does not leave its marker behind on the hull.
 	if slot < _mounts.size():
 		shape.position = _mounts[slot].position
+	var countdown: Variant = _countdowns.get(slot)
+	if countdown is Label:
+		# Centred on the mount rather than anchored at it, so a number reads as belonging to
+		# the hardware underneath it instead of hanging off to one side.
+		(countdown as Label).position = shape.position - Vector2(24, 22)
 	var part := fitted_at(slot)
 	shape.visible = part != null
+	if countdown is Label:
+		_paint_countdown(slot)
 	if part == null:
 		return
 	# The shape and colour are derived from the part rather than configured on it, so a new
@@ -345,6 +543,31 @@ func _render(slot: int) -> void:
 	# slot art exists it replaces this whole step.
 	shape.polygon = _marker_polygon(part.id)
 	shape.color = _marker_color(part.id)
+
+
+## Writes the countdown over [param slot], or hides it when there is nothing to count down.
+## Written as whole seconds so the label is only touched when the number actually changes,
+## which is what keeps this off the per-frame cost of a satellite with nothing installing.
+func _paint_countdown(slot: int) -> void:
+	var countdown: Variant = _countdowns.get(slot)
+	if not (countdown is Label):
+		return
+	var label := countdown as Label
+	var remaining := install_remaining(slot)
+	if remaining <= 0.0 or fitted_at(slot) == null:
+		label.visible = false
+		return
+	var text := _countdown(remaining)
+	if label.visible and label.text == text:
+		return
+	label.text = text
+	label.visible = true
+
+
+## Seconds as [code]m:ss[/code], so a countdown reads as time rather than as a number.
+func _countdown(seconds: float) -> String:
+	var whole := int(ceil(seconds))
+	return "%d:%02d" % [whole / 60, whole % 60]
 
 
 ## Marker outline for a part: three shapes, so two parts are told apart by outline as well as
@@ -391,16 +614,73 @@ func slot_snapshot() -> Dictionary:
 	return result
 
 
-## Puts a saved arrangement back. A mount saved with a part the catalogue no longer has is
-## left empty rather than filled with nothing: the part was removed from the game, and the
-## hardware with it. A mount saved with more copies of one part than were bought is dropped
-## too, for the same reason the live rules refuse to fit one: a save is not a way to mount
-## hardware that was never bought.
+## Which mounts were already set up when the save was written, as {slot: true}. Kept apart
+## from [method slot_snapshot] because it answers a different question, and because the save
+## codec keeps every block a flat map of names to values.
 ##
-## Runs after the parts block is restored, so the parts are back before they are looked up.
-func restore_slots(saved: Dictionary) -> void:
+## This is what stops a reloaded antenna from paying twice. The stats block is saved as
+## absolute numbers that already include every antenna that was working, so restoring a
+## mount as finished must not write its effects again - while an antenna that was still being
+## installed when the game closed paid nothing, and starts its wait again here.
+func installed_snapshot() -> Dictionary:
+	var result: Dictionary = {}
+	for slot: int in _fitted.size():
+		if _fitted[slot] != null and _installing[slot] <= 0.0:
+			result[slot] = true
+	return result
+
+
+## The stats of the antennas that are fitted, as
+## {slot: {strength, range}}. Kept apart from
+## [method slot_snapshot] for the same reason the installed
+## block is: it answers a different question, and because the
+## save codec keeps every block a flat map of names to values.
+func antenna_stats_snapshot() -> Dictionary:
+	var result: Dictionary = {}
+	for slot: int in _fitted.size():
+		var part: PartDefinition = _fitted[slot]
+		if part == null or part.antenna_channel.is_empty():
+			continue
+		var stats: Dictionary = _antenna_stats[slot] if slot < _antenna_stats.size() else {}
+		if stats.is_empty():
+			continue
+		result[slot] = stats.duplicate()
+	return result
+
+
+## Puts a saved antenna stats block back, as
+## [method antenna_stats_snapshot] produced. A mount with
+## nothing saved keeps empty stats, which the satellite
+## re-seeds from the channel defaults.
+func restore_antenna_stats(saved: Dictionary) -> void:
+	for slot: int in _antenna_stats.size():
+		_antenna_stats[slot] = {}
+	for key: Variant in saved:
+		var slot := int(key)
+		if slot < 0 or slot >= _antenna_stats.size():
+			continue
+		var stats: Variant = saved[key]
+		_antenna_stats[slot] = (stats as Dictionary).duplicate() if stats is Dictionary else {}
+
+
+## Puts a saved arrangement back. A mount saved with a part the catalogue no
+## longer has is left empty rather than filled with nothing: the part was
+## removed from the game, and the hardware with it. A mount saved with more
+## copies of one part than were bought is dropped too, for the same reason the
+## live rules refuse to fit one: a save is not a way to mount hardware that was
+## never bought.
+##
+## [param installed] is what [method installed_snapshot] produced: the mounts that
+## were already working. Anything else starts its setup wait again.
+##
+## Runs after the parts block is restored, so the parts are back before they are
+## looked up.
+func restore_slots(saved: Dictionary, installed: Dictionary = {}) -> void:
 	for slot: int in _fitted.size():
 		_fitted[slot] = null
+		_installing[slot] = 0.0
+		if slot < _antenna_stats.size():
+			_antenna_stats[slot] = {}
 	var restored: Dictionary = {}
 	for key: Variant in saved:
 		var slot := int(key)
@@ -414,5 +694,10 @@ func restore_slots(saved: Dictionary) -> void:
 			continue
 		restored[part.id] = placed + 1
 		_fitted[slot] = part
+		# Already working when the game was saved: no wait, and no effects written, since
+		# the absolute stats being restored already count it. Anything else is set up from
+		# scratch, and writes its effects when that finishes.
+		if not bool(installed.get(slot, false)):
+			_start_install(slot, part)
 	_render_all()
 	slots_changed.emit(-1)

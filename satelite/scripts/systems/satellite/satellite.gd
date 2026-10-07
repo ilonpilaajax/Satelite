@@ -22,6 +22,7 @@ extends Node2D
 
 signal stats_changed(snapshot: Dictionary)
 signal upgrade_purchased(upgrade: Resource, level: int)
+signal upgrade_purchase_rejected(upgrade: Resource, reason: StringName)
 signal upgrades_changed()
 signal part_purchased(part: Resource, owned: int)
 signal parts_changed()
@@ -35,6 +36,25 @@ signal downlink_changed()
 
 @export var id: StringName = &"satellite"
 @export var display_name: String = "SATELITE-01"
+## What kind of satellite this is, as the config menu shows it. A
+## property of the satellite rather than of any module, so it lives
+## here next to the name; each satellite in a scene carries its own.
+@export var satellite_type: String = "SATELITE"
+## How much memory this satellite carries, in megabytes. Configuration the
+## config menu edits: it is a property of the satellite rather than of any
+## module, and nothing reads it yet, but it is saved the way the name is.
+@export var config_memory: float = 256.0
+## How far a click may land from [member click_center] and still count as a
+## click on this satellite, in world pixels. The hull is drawn large, so the
+## radius is generous rather than pixel-exact.
+@export var click_radius: float = 150.0
+## The node a click is measured from, which is the body rather than this root:
+## the root sits at the origin while the hull is drawn around the body.
+@export var click_center: NodePath = ^"Body"
+## How far the pointer may be from a mount and still count as
+## hovering the antenna in it, in world pixels. A mount is a small
+## target on a large hull, so the radius is generous.
+@export var hover_radius: float = 40.0
 
 var _stats: SatelliteStats = null
 var _upgrades: SatelliteUpgrades = null
@@ -47,6 +67,9 @@ var _downlink: SatelliteDownlink = null
 ## The control panel, found by contract rather than by type: it is an optional module with no
 ## class name, and this aggregate would otherwise have to import it.
 var _control_panel: Node = null
+## What a hover over an antenna shows, kept on the satellite so it
+## follows the hull wherever the satellite goes.
+var _tooltip: Label = null
 
 
 func _ready() -> void:
@@ -54,8 +77,24 @@ func _ready() -> void:
 	_bind_modules()
 	_republish()
 	_push_antenna_counts()
+	_push_upgrade_levels()
 	_emit_stats()
+	_tooltip = _make_tooltip()
 	SatelliteController.register(self)
+	# An accepted signal travels from the panel to the downlink
+	# through here: the two modules never know each other, the
+	# aggregate is what knows both.
+	if _control_panel != null and _control_panel.has_signal(&"signal_accepted"):
+		_control_panel.connect(&"signal_accepted", _on_signal_accepted)
+
+
+## A signal accepted in the signals menu goes to the
+## downlink, which is where signals are sent from. The
+## downlink announces the new entry itself, so the menus
+## keep up with no further wiring.
+func _on_signal_accepted(_channel: StringName, found: Resource) -> void:
+	if _downlink != null:
+		_downlink.queue_signal(found)
 
 
 func _exit_tree() -> void:
@@ -64,6 +103,113 @@ func _exit_tree() -> void:
 	var hub := get_node_or_null(^"/root/SatelliteController")
 	if hub and hub.has_method(&"unregister"):
 		hub.unregister(self)
+
+
+## A click on the hull makes this satellite the one in focus and opens its
+## config menu. The menu reads through the hub, so the screen that comes up
+## describes this satellite; making it active first is what puts it there.
+## A hover over a mount shows what antenna is in it and how that antenna
+## is set, which is the same the config menu lists one antenna at a time.
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var click := event as InputEventMouseButton
+		if not click.pressed or click.button_index != MOUSE_BUTTON_LEFT:
+			return
+		if get_viewport().is_input_handled():
+			return
+		if click.position.distance_to(_click_center()) > click_radius:
+			return
+		get_viewport().set_input_as_handled()
+		_hide_tooltip()
+		SatelliteController.set_active(self)
+		MenuController.open_menu(MenuController.Id.CONFIG)
+	elif event is InputEventMouseMotion:
+		_on_mouse_motion(event as InputEventMouseMotion)
+
+
+## Where a click on this satellite is measured from: the body's position in
+## the world, or this root's own when the scene has no body to point at.
+func _click_center() -> Vector2:
+	var body: Node = get_node_or_null(click_center)
+	if body is Node2D:
+		return (body as Node2D).global_position
+	return global_position
+
+
+## The antenna under the pointer, if there is one. A mount is
+## where an antenna lives, so the pointer is checked against the
+## mounts, and a mount only answers when it holds an antenna -
+## an empty mount or a part with no channel is nothing to read.
+func _on_mouse_motion(event: InputEventMouseMotion) -> void:
+	var slot := _slots.mount_at(event.position, hover_radius) if _slots != null and _slots.has_method(&"mount_at") else -1
+	var channel := _channel_of_slot(slot)
+	if channel.is_empty():
+		_hide_tooltip()
+		return
+	_show_tooltip(channel, event.position)
+
+
+## The channel the antenna in [param slot] listens on, or empty
+## when nothing is fitted there or it is not an antenna.
+func _channel_of_slot(slot: int) -> StringName:
+	if slot < 0 or _slots == null:
+		return &""
+	var states: Array = _slots.slots()
+	if slot >= states.size():
+		return &""
+	var entry: Dictionary = states[slot]
+	return StringName(entry.get(&"antenna_channel", &""))
+
+
+## Shows what [param channel]'s antennas are and how they are set,
+## beside the pointer. The control panel is what keeps the values,
+## so the hover reads them through the same contract the config
+## menu does.
+func _show_tooltip(channel: StringName, at: Vector2) -> void:
+	if _tooltip == null or _control_panel == null or not _control_panel.has_method(&"antenna_config"):
+		return
+	var config: Dictionary = _control_panel.call(&"antenna_config", channel)
+	_tooltip.text = "%s ANTENNA x%d\nSTRENGTH %d\nRANGE %s" % [
+		str(config.get(&"type", channel)).to_upper(),
+		int(config.get(&"count", 0)),
+		int(config.get(&"strength", 0)),
+		_number_text(float(config.get(&"range", 0.0))),
+	]
+	_tooltip.position = to_local(at) + Vector2(14, 14)
+	_tooltip.visible = true
+
+
+func _hide_tooltip() -> void:
+	if _tooltip != null:
+		_tooltip.visible = false
+
+
+## A number as whole when it is one, so a range reads as 4 rather
+## than 4.0.
+func _number_text(value: float) -> String:
+	if is_equal_approx(value, float(int(value))):
+		return "%d" % int(value)
+	return String.num(value, 2)
+
+
+## The hover readout: a small dark label with a border, so it reads
+## over the hull art whatever it is drawn on.
+func _make_tooltip() -> Label:
+	var label := Label.new()
+	label.visible = false
+	label.z_index = 10
+	var background := StyleBoxFlat.new()
+	background.bg_color = Color(0.0862745, 0.0941176, 0.129412, 0.980392)
+	background.border_color = Color(0.239216, 0.270588, 0.380392, 1)
+	background.set_border_width_all(1)
+	background.set_corner_radius_all(4)
+	background.content_margin_left = 8.0
+	background.content_margin_top = 4.0
+	background.content_margin_right = 8.0
+	background.content_margin_bottom = 4.0
+	label.add_theme_stylebox_override(&"normal", background)
+	add_child(label)
+	return label
 
 
 # --- Modules ---------------------------------------------------------------
@@ -110,8 +256,39 @@ func stat_snapshot() -> Dictionary:
 
 ## Every stat with its caption, unit and precision. Readouts render this instead
 ## of a hardcoded list, so they follow whatever this satellite tracks.
+##
+## The speed readout carries the solar array's scale, so the screens show
+## how fast the satellite actually travels rather than the raw sum its
+## thrusters and upgrades add up to. The stat block itself keeps the raw
+## sum: saves, effect reapplication and prices all read that one number.
 func stat_descriptors() -> Array:
-	return _stats.descriptors() if _stats != null else []
+	var result := _stats.descriptors() if _stats != null else []
+	_apply_solar_scale(result)
+	return result
+
+
+## Multiplies the speed entry in [param descriptors] - the copy
+## [method stat_descriptors] hands out, never the stat block - by the
+## solar array's scale, second unit included, since that is derived
+## from the same value. Leaves every other stat, and a satellite with
+## no motion module, untouched.
+func _apply_solar_scale(descriptors: Array) -> void:
+	if _motion == null:
+		return
+	var scale := _motion.solar_scale()
+	if scale == 1.0:
+		return
+	for entry: Variant in descriptors:
+		if not (entry is Dictionary):
+			continue
+		var descriptor: Dictionary = entry
+		if StringName(descriptor.get("id", &"")) != SatelliteStats.SPEED:
+			continue
+		descriptor["value"] = float(descriptor.get("value", 0.0)) * scale
+		var secondary: Variant = descriptor.get("secondary")
+		if secondary is Dictionary:
+			var alt: Dictionary = secondary
+			alt["value"] = float(alt.get("value", 0.0)) * scale
 
 
 func set_stat(stat_id: StringName, value: Variant) -> void:
@@ -140,6 +317,12 @@ func cost_of(upgrade_id: StringName) -> int:
 
 func can_purchase(upgrade_id: StringName) -> bool:
 	return _upgrades.can_purchase(upgrade_id) if _upgrades != null else false
+
+
+## Why [param upgrade_id] cannot be bought right now, or empty when it can. What a menu row
+## shows on its disabled button, so the rule stays in one place.
+func upgrade_purchase_reason(upgrade_id: StringName) -> StringName:
+	return _upgrades.rejection_reason(upgrade_id) if _upgrades != null else &"unknown_upgrade"
 
 
 func purchase_upgrade(upgrade_id: StringName) -> bool:
@@ -185,9 +368,33 @@ func available_slots() -> int:
 ## whether it happened; what it replaced is on [signal SatelliteSlots.part_fitted].
 ##
 ## Each copy bought can be fitted in its own mount, so fitting a part the satellite already
-## carries mounts another copy rather than moving the first one.
+## carries mounts another copy rather than moving the first one. The antenna that lands
+## in the mount is given its own stats, seeded from its channel's defaults, so every
+## antenna carries its own from the moment it is mounted.
 func fit_part(part_id: StringName, slot: int) -> bool:
-	return _slots != null and _slots.fit(part_id, slot)
+	var fitted := _slots != null and _slots.fit(part_id, slot)
+	if fitted:
+		_seed_slot_stats(slot)
+	return fitted
+
+
+## Gives the antenna in [param slot] its own stats, taken
+## from its channel's defaults. Skips a mount that already
+## carries stats, so re-fitting the antenna that is already
+## there does not wipe what it was set to.
+func _seed_slot_stats(slot: int) -> void:
+	if _slots == null or _control_panel == null:
+		return
+	var channel := _channel_of_slot(slot)
+	if channel.is_empty():
+		return
+	if not _slots.antenna_at(slot).is_empty():
+		return
+	var stats: Dictionary = {
+		&"strength": _control_panel.call(&"antenna_strength_of", channel),
+		&"range": _control_panel.call(&"antenna_range_of", channel),
+	}
+	_slots.seed_antenna_stats(slot, stats)
 
 
 ## Empties [param slot] and returns what was in it, or null. The part stays bought.
@@ -215,6 +422,18 @@ func fitted_count_of_part(part_id: StringName) -> int:
 ## already is.
 func can_fit_part(part_id: StringName) -> bool:
 	return _slots != null and _slots.can_fit(part_id)
+
+
+## Seconds of setup left on [param slot], or 0 when the mount is empty or already working.
+## What a readout counts down.
+func install_remaining(slot: int) -> float:
+	return _slots.install_remaining(slot) if _slots != null else 0.0
+
+
+## Whether [param slot] holds hardware that is up and running: fitted, and past its setup
+## wait. False for an empty mount and for an antenna still being installed.
+func is_installed(slot: int) -> bool:
+	return _slots != null and _slots.is_installed(slot)
 
 
 # --- Contract: actions -----------------------------------------------------
@@ -274,6 +493,40 @@ func set_distance_accrual(enabled: bool) -> void:
 		_motion.accrual_enabled = enabled
 
 
+# --- Contract: config --------------------------------------------------------
+
+## What the config menu shows: where the satellite is, how strongly its
+## antennas listen, how much memory it carries and what kind of satellite
+## it is. One dictionary because the four travel together - a menu opens
+## on a whole satellite, not on a value.
+func config_snapshot() -> Dictionary:
+	return {
+		"position": position,
+		"strength": _antenna_strength(),
+		"memory": config_memory,
+		"type": satellite_type,
+	}
+
+
+## The base strength the control panel listens at, or 0 when this satellite has
+## no panel. Read through the contract because the panel has no class name, the
+## same as every other panel access here.
+func _antenna_strength() -> int:
+	if _control_panel != null and _control_panel.has_method(&"antenna_strength"):
+		return int(_control_panel.call(&"antenna_strength"))
+	return 0
+
+
+## Every antenna's configuration, as {channel: {type, count, strength, range}}.
+## What the config menu's antenna section is built from, so each antenna shows
+## its own type and settings rather than the satellite's as a whole.
+func antenna_configs() -> Dictionary:
+	if _control_panel != null and _control_panel.has_method(&"antenna_configs"):
+		var result: Variant = _control_panel.call(&"antenna_configs")
+		return (result as Dictionary) if result is Dictionary else {}
+	return {}
+
+
 # --- Contract: persistence -------------------------------------------------
 
 ## Everything a save needs to bring this satellite back: identity, stats, upgrade
@@ -289,17 +542,27 @@ func save_data() -> Dictionary:
 		"granted": _actions.granted_snapshot(),
 		"cooldowns": _actions.cooldowns_snapshot(),
 	}
-	return {
+	var state: Dictionary = {
 		"id": str(id),
 		"display_name": display_name,
+		"position": position,
+		"memory": config_memory,
 		"stats": _stats.snapshot() if _stats != null else {},
 		"upgrades": _upgrades.levels_snapshot() if _upgrades != null else {},
 		"parts": _parts.owned_snapshot() if _parts != null else {},
 		"slots": _slots.slot_snapshot() if _slots != null else {},
+		"installed": _slots.installed_snapshot() if _slots != null else {},
+		"antenna_stats": _slots.antenna_stats_snapshot() if _slots != null else {},
 		"actions": actions if _actions != null else {},
 		"appearance": _appearance.snapshot() if _appearance != null else {},
 		"downlink": _downlink.sent_snapshot() if _downlink != null else {},
 	}
+	# Accepted signals are state, not catalogue: a save names
+	# them by id, and load_data resolves them against the
+	# panel's catalogue again.
+	if _downlink != null:
+		state["downlink_signals"] = _downlink.signal_snapshot()
+	return state
 
 
 ## Restores what [method save_data] produced.
@@ -315,13 +578,28 @@ func load_data(data: Dictionary) -> void:
 	var raw_name: Variant = data.get("display_name")
 	if raw_name != null:
 		display_name = str(raw_name)
+	var raw_position: Variant = data.get("position")
+	if raw_position is Vector2:
+		position = raw_position
+	var raw_memory: Variant = data.get("memory")
+	if raw_memory != null:
+		config_memory = float(raw_memory)
 	if _upgrades != null:
 		_upgrades.restore_levels(_as_dictionary(data.get("upgrades")))
 	if _parts != null:
 		_parts.restore_owned(_as_dictionary(data.get("parts")))
 	# After the parts, because a mount is only restored to a part the catalogue still has.
+	# The installed block rides along so a mount that was already working is not set up a
+	# second time and paid for twice: the stats restored below already count it.
 	if _slots != null:
-		_slots.restore_slots(_as_dictionary(data.get("slots")))
+		_slots.restore_slots(
+			_as_dictionary(data.get("slots")),
+			_as_dictionary(data.get("installed")))
+		_slots.restore_antenna_stats(_as_dictionary(data.get("antenna_stats")))
+		# A save written before antennas carried their own stats has none,
+		# so each restored antenna is seeded from its channel's defaults.
+		for slot: int in _slots.available_slots():
+			_seed_slot_stats(slot)
 	if _actions != null:
 		var actions := _as_dictionary(data.get("actions"))
 		_actions.restore(actions.get("granted", []), actions.get("cooldowns", {}))
@@ -331,10 +609,36 @@ func load_data(data: Dictionary) -> void:
 		_appearance.restore(_as_dictionary(data.get("appearance")))
 	if _downlink != null:
 		_downlink.restore_sent(_as_dictionary(data.get("downlink")))
+		# Accepted signals come back as entries of their own, resolved
+		# against the panel's catalogue because a save names them by id.
+		var restored: Array[Dictionary] = []
+		for entry: Variant in _as_array(data.get("downlink_signals")):
+			var saved: Dictionary = entry
+			var definition: SignalDefinition = _signal_of(StringName(saved.get("signal", &"")))
+			if definition != null:
+				restored.append({
+					"signal": definition,
+					"state": int(saved.get("state", SatelliteDownlink.SIGNAL_QUEUED)),
+				})
+		_downlink.restore_queue(restored)
+
+
+## The control panel's catalogue entry with this id, or null.
+## The panel owns the signal catalogue, so the aggregate asks
+## it by contract rather than reaching into it.
+func _signal_of(signal_id: StringName) -> SignalDefinition:
+	if _control_panel == null or not _control_panel.has_method(&"signal_of"):
+		return null
+	var found: Variant = _control_panel.call(&"signal_of", signal_id)
+	return found as SignalDefinition
 
 
 func _as_dictionary(value: Variant) -> Dictionary:
 	return (value as Dictionary) if value is Dictionary else {}
+
+
+func _as_array(value: Variant) -> Array:
+	return (value as Array) if value is Array else []
 
 
 # --- Internals -------------------------------------------------------------
@@ -365,7 +669,7 @@ func _bind_modules() -> void:
 	if _actions != null:
 		_actions.bind(_stats)
 	if _motion != null:
-		_motion.bind(_stats)
+		_motion.bind(_stats, _slots, _upgrades)
 	if _downlink != null:
 		_downlink.bind(_stats)
 	if _upgrades != null:
@@ -382,6 +686,7 @@ func _republish() -> void:
 		_stats.stats_changed.connect(_on_stats_changed)
 	if _upgrades != null:
 		_upgrades.upgrade_purchased.connect(_on_upgrade_purchased)
+		_upgrades.purchase_rejected.connect(_on_upgrade_rejected)
 		_upgrades.upgrades_changed.connect(_on_upgrades_changed)
 	if _parts != null:
 		_parts.part_purchased.connect(_on_part_purchased)
@@ -407,10 +712,16 @@ func _on_stats_changed(snapshot: Dictionary) -> void:
 
 
 func _on_upgrade_purchased(upgrade: Resource, level: int) -> void:
+	_push_upgrade_levels()
 	upgrade_purchased.emit(upgrade, level)
 
 
+func _on_upgrade_rejected(upgrade: Resource, reason: StringName) -> void:
+	upgrade_purchase_rejected.emit(upgrade, reason)
+
+
 func _on_upgrades_changed() -> void:
+	_push_upgrade_levels()
 	upgrades_changed.emit()
 
 
@@ -430,6 +741,20 @@ func _on_parts_changed() -> void:
 func _on_slots_changed(slot: int) -> void:
 	_push_antenna_counts()
 	slots_changed.emit(slot)
+
+
+## Tells the control panel how many levels of each upgrade have been bought, so the panel
+## keeps a count per upgrade rather than every reader going back to the upgrades block.
+##
+## The panel is optional and answered by contract, so a satellite without one loses nothing.
+## Pushed as a whole block rather than one level at a time: a level can be granted or restored
+## in a jump, and the panel would rather be told the answer than keep up with the steps.
+func _push_upgrade_levels() -> void:
+	if _upgrades == null or _control_panel == null:
+		return
+	if not _control_panel.has_method(&"set_upgrade_levels"):
+		return
+	_control_panel.call(&"set_upgrade_levels", _upgrades.levels_snapshot())
 
 
 ## Tells the control panel how many pieces of hardware it has per channel, counted off the

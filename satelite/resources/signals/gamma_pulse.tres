@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="SignalDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="SignalDefinition" format=3 uid="uid://b0n8p4x18gpel"]
 
-[ext_resource type="Script" path="res://scripts/systems/satellite/signal_definition.gd" id="1_sigdef"]
+[ext_resource type="Script" uid="uid://51gghjg5q413" path="res://scripts/systems/satellite/signal_definition.gd" id="1_sigdef"]
 
 [resource]
 script = ExtResource("1_sigdef")
@@ -9,6 +9,7 @@ display_name = "Gamma pulse"
 signal_type = &"pulse"
 channel = &"radiation"
 description = "A hard burst of high-energy photons. Brief, and worth noticing."
+points = 50
 details = {
 &"Dose rate": "3.1 mSv/h",
 &"Duration": "0.4 s",

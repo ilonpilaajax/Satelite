@@ -103,6 +103,11 @@ func _rejection(part_id: StringName) -> StringName:
 ## Fits one copy, paying [member PartDefinition.price] when a currency is set.
 ## Returns false without side effects when the part is unknown, fully fitted,
 ## locked or unaffordable.
+##
+## Buying does not write [member PartDefinition.stat_effects]: those land when the copy is
+## fitted and finished being set up, so a part in the store and one on the hull pay the same
+## way. Only the one-off unlocks are written here, since an action is unlocked by owning the
+## hardware, not by where it is standing.
 func purchase(part_id: StringName) -> bool:
 	var reason := _rejection(part_id)
 	if reason != &"":
@@ -116,21 +121,21 @@ func purchase(part_id: StringName) -> bool:
 	if _charges():
 		_stats.add_stat(currency_stat, -float(part.price))
 	_owned[part_id] = owned + 1
-	_apply(part, owned == 0)
+	_on_purchased(part, owned == 0)
 	part_purchased.emit(part, owned + 1)
 	parts_changed.emit()
 	return true
 
 
-## Fits a part for free, e.g. when loading a save. Skips the price and still writes
-## the effects.
+## Fits a part for free, e.g. when loading a save. Skips the price and still unlocks its
+## actions; its stat effects arrive with the mount that carries it.
 func grant(part_id: StringName, count: int = 1) -> void:
 	var part := find(part_id)
 	if part == null or count <= 0:
 		return
 	var owned := owned_count(part_id)
 	_owned[part_id] = mini(owned + count, part.max_owned)
-	_apply(part, owned == 0)
+	_on_purchased(part, owned == 0)
 	part_purchased.emit(part, owned_count(part_id))
 	parts_changed.emit()
 
@@ -187,16 +192,42 @@ func _charges() -> bool:
 	return _stats != null and currency_stat != &""
 
 
-## [param first_time] gates the one-off effects: an action is only granted when the
-## part goes from not fitted to fitted, since the second copy adds no new action.
-func _apply(part: PartDefinition, first_time: bool) -> void:
+## Writes [param part]'s stat effects, once per copy that is actually working. Called by
+## [SatelliteSlots] when a copy is fitted and its setup finishes, so the satellite's numbers
+## follow the hardware rather than the receipt.
+##
+## Effects are written per activation rather than per copy so that taking a part back off
+## the hull can give the numbers back: [method deactivate] is the other half of this pair.
+func activate(part: PartDefinition) -> void:
 	if _stats != null and not part.stat_effects.is_empty():
 		_stats.apply_effects(part.stat_effects, 1)
+
+
+## Takes [param part]'s stat effects back off, for a copy that has been replaced or taken out
+## of its mount. Without this, swapping an antenna would stack its bonus up forever.
+func deactivate(part: PartDefinition) -> void:
+	if _stats != null and not part.stat_effects.is_empty():
+		_stats.apply_effects(part.stat_effects, -1)
+
+
+## Unlocks a part's actions. Only the first copy unlocks anything, since the second is more
+## of the same hardware and adds no new action.
+func _grant_actions(part: PartDefinition) -> void:
+	if _actions == null:
+		return
+	for action in part.unlocks_actions:
+		_actions.grant(action)
+
+
+## What buying a copy writes: how the part looks on the satellite, and its actions the first
+## time. The stat effects are left out on purpose - they follow the mount, not the receipt,
+## so see [method activate]. Appearance is written here because it is a description of what
+## the satellite carries rather than a running total that could be given back.
+func _on_purchased(part: PartDefinition, first_time: bool) -> void:
 	if _appearance != null and not part.appearance_effects.is_empty():
 		_appearance.set_visuals(part.appearance_effects)
-	if first_time and _actions != null:
-		for action in part.unlocks_actions:
-			_actions.grant(action)
+	if first_time:
+		_grant_actions(part)
 
 
 # --- Persistence ------------------------------------------------------------

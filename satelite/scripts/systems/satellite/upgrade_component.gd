@@ -65,8 +65,13 @@ func can_purchase(upgrade_id: StringName) -> bool:
 	return _rejection(upgrade_id) == &""
 
 
+## Why [param upgrade_id] cannot be bought right now, or empty when it can. Public so a menu
+## can say why its button is dead without duplicating the rules.
+func rejection_reason(upgrade_id: StringName) -> StringName:
+	return _rejection(upgrade_id)
+
+
 ## Why [param upgrade_id] cannot be bought right now, or empty when it can.
-## Also tells a menu why a row is disabled without duplicating the rules.
 func _rejection(upgrade_id: StringName) -> StringName:
 	var upgrade := find(upgrade_id)
 	if upgrade == null:

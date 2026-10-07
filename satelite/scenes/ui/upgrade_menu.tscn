@@ -22,6 +22,10 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_upgrade")
+menu_id = 3
+heading = "Upgrades"
+subtitle = "Spend credits on upgrades"
+content_placeholder = "No upgrades are available for this satellite yet."
 
 [node name="Backdrop" type="ColorRect" parent="." unique_id=16117376]
 layout_mode = 1
@@ -72,18 +76,43 @@ theme_override_colors/font_color = Color(0.478431, 0.529412, 0.639216, 1)
 text = "Spend resources on upgrades"
 horizontal_alignment = 1
 
+[node name="Wallet" type="Label" parent="Panel/Margin/Layout" unique_id=1505847362]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85098, 0.890196, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = ""
+horizontal_alignment = 1
+
 [node name="Separator" type="HSeparator" parent="Panel/Margin/Layout" unique_id=2026712657]
 layout_mode = 2
+
+[node name="Scroll" type="ScrollContainer" parent="Panel/Margin/Layout" unique_id=1755009488]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="List" type="VBoxContainer" parent="Panel/Margin/Layout/Scroll" unique_id=1192034807]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
 
 [node name="ContentPlaceholder" type="Label" parent="Panel/Margin/Layout" unique_id=82484834]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 120)
 layout_mode = 2
-size_flags_vertical = 3
 theme_override_colors/font_color = Color(0.560784, 0.607843, 0.717647, 1)
-text = "Available upgrades will be listed here."
+text = "No upgrades are available for this satellite yet."
 horizontal_alignment = 1
 vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="Status" type="Label" parent="Panel/Margin/Layout" unique_id=1658294771]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.478431, 0.529412, 0.639216, 1)
+horizontal_alignment = 1
 autowrap_mode = 2
 
 [node name="CloseButton" type="Button" parent="Panel/Margin/Layout" unique_id=562013979]

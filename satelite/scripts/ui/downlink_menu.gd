@@ -21,7 +21,7 @@ extends MenuPanel
 ## and the row appears, no change to this script.
 
 ## Shown when the satellite has no packets listed at all.
-@export var empty_message: String = "No data to send yet. Nothing has been collected."
+@export var empty_message: String = "Nothing to send yet. Nothing has been collected, and no signal has been accepted."
 
 ## Shown when the satellite has packets but the one picked has already gone down.
 @export var nothing_selected_message: String = "Pick something from the list to send it."
@@ -284,12 +284,18 @@ func _refresh_totals() -> void:
 ## Why a row's send is refused, phrased for a player rather than as a constant.
 func _reason_text(row: Dictionary) -> String:
 	match StringName(row.get("reason", &"")):
-		&"exhausted":
+		&"exhausted", &"sent":
 			return "Already sent. There is no more of this."
+		&"sending":
+			return "Transmission in progress. The points arrive when it lands."
 	return ""
 
 
 func _tooltip_for(row: Dictionary) -> String:
+	if StringName(row.get("kind", &"packet")) == &"signal":
+		if bool(row.get("can_send", false)):
+			return "Send this signal. %d points arrive when it lands." % int(row.get("size", 0))
+		return _reason_text(row)
 	var sent := str(row.get("sent_label", ""))
 	if sent.is_empty():
 		return "Pick this to send it."
@@ -328,7 +334,12 @@ func _on_send_pressed() -> void:
 		_set_status(_reason_text(row))
 		return
 	if SatelliteController.transmit_data(_selected_id):
-		_set_status("Sent %s." % str(row.get("display_name", "data")))
+		if StringName(row.get("kind", &"packet")) == &"signal":
+			# A signal's send takes time, so what the player did was start
+			# it; the points turn up when the transmission lands.
+			_set_status("Sending %s. The points arrive when it lands." % str(row.get("display_name", "signal")))
+		else:
+			_set_status("Sent %s." % str(row.get("display_name", "data")))
 	else:
 		_set_status("Could not send that.")
 
